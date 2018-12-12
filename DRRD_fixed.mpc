@@ -1,0 +1,258 @@
+\ DRRD.mpc
+\
+\ Created by:        Marcelo S. Caetano / Marcelo B. Reyes / Diego H. Miranda
+\ Created on:        Oct 09, 2013
+\ Last modified by:  Marcelo Reyes
+\ Last modified on:
+\ Modification:
+\
+\ Experiment:        Differential Reinforcement of Response Duration (DRRD) without Time Out and no phase back
+\ Duration:          120 minutes
+\ Number of cycles:  TBD
+\
+\ Comments:          TBD
+\
+\ Procedure:
+\ TBD
+\
+\
+\ Definition of the inputs (from rat)
+\                   Event Code
+^L_Press=1          \ 1 (.001)
+^R_Press=2          \ 2 (.002)
+^L_Release = 3		\ 3 (.003)
+^R_Release = 4		\ 4 (.004)
+^Head_in = 5		\ 5 (.005)
+^Head_out = 9		\ 9 (.009)
+
+\ Definition of the outputs (from experimenter)
+
+\Recorded as:
+			          \ON             OFF
+^L_Light=1		  \11 (.011)      21 (.021)
+^R_Light=2		  \12 (.012)      22 (.022)
+^HouseLight=5   \15 (.015)      25 (.025)
+^Food=6         \16 (.016)      26 (.026)
+^Phase_change=7	\17 (.017)	    27 (.027)	On means the prime was increased by ^Increment and Off means the prime was decrease by ^Increment
+^Prime = 8
+^Spare=10
+
+\ Z Pulse constants; output off and on states
+^OnL_Light = 1
+^OnR_Light = 2
+^OnHouseLight = 3
+^OnFood = 4
+^OnPhase_change = 5
+^OnPrime = 6
+
+^OffL_Light = 11
+^OffR_Light = 12
+^OffHouseLight = 13
+^OffFood = 14
+^OffPhase_change = 15
+
+^STORE = 1000           \ divide by ^STORE to place event code in .xxx
+^ON = 10                \ add ^ON
+^OFF = 20               \ add ^OFF
+^STATE = 29				\ Add 29 so that codes for states start at 50
+
+
+\ Constants for current experiment
+^sessionLength = 120  \ session length in minutes (e.g., 60 minutes)
+^InitialPrime = 100   \ Initial prime value (in ms) - ALL CONSTANTS MUST BE INTEGER
+^Increment = 0        \ Prime increment     (in ms) - ALL CONSTANTS MUST BE INTEGER
+^maxPrimeTime = 15    \maximal time the lever needs to be held (in units of 100ms: 12 = 1200ms).
+
+\ STATE constants
+^StateEndSession = 32		\ Event Code on Disk is (32+^STATE)/^STORE = .061
+
+DIM A=20000, B=30, T=3, D=2, E=1, W=2 \Check that variable A is the correct one
+
+
+\ Variables used:
+  \A - Array for time coded events
+  \B - Total number of each event
+  \C - For flicker
+  \D - Variable to control the time between lever press and lever release
+	\		D(0) = The current lever state
+	\		D(1) = Time when the lever was pressed for the first time
+	\		D(2) = Time when the lever was released
+	\E - Variable representing Prime
+	\		E(0) = Initial prime
+	\		E(1) = Current prime
+ 	\F - Consecutive correct answers
+	\G - Variable used to count time (in minutes)
+	\H - Prime Flag
+	\I -
+	\J -
+	\K - Variable that controls the initial prime based on the results of the previous session (changed in the submacro according to the subject) max. value 12
+	\L -
+	\M -
+	\N -
+	\O -
+	\P -
+	\Q -
+	\R -
+	\S -
+	\T - Variable for time
+	\U - Session start time
+	\V -
+	\W - Variable used to record lever releases
+	\X -
+	\Y - Index counts number of time-stamped events
+	\Z -
+
+
+\ Save all variables to disk
+DISKVARS = A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z
+
+
+\ *******************************************************************
+\ Enter procedure below; Experimental state sets 1-17 available
+
+s.s.1,
+	s1,
+		#Start: Set E(0)=^InitialPrime*0.001"*K, F=0, H=0; --->s2   \Setting initial values
+
+	s2,
+		30": Set E(1)=E(0); On^L_Light; z^OnL_Light; ---> s3 			  \The first current prime time is defined and The Left Light is turned on
+
+	s3,
+		#R^L_Press: Set D(1) = BTIME; --->s4      						  \When the Left Lever is pressed, the variable D(1) assumes the current time value
+
+	s4,
+		#R^L_Press: Set D(0) = BTIME;							  		  \Checking if the lever is still pressed
+		IF (D(0)-D(1) >= E(1)) and (H=0)  [@SavePrime, @Ignore]			  \Testing if the prime time was reached
+			@SavePrime: z^OnPrime; set H=1 --->s4		\If yes, that time is saved
+			@Ignore: --->s4							            \If not, that time is not saved
+		0": Set D(2) = BTIME; Set H=0; --->s5			\When the Left Lever is released, the variable D(2) assumes the current time value
+
+	s5,
+		.01": IF D(2)-D(1) >= E(1) [@Food, @NoFood]				\Testing if the time between the press and release is equal or above the current prime time
+				@Food:   Add F;    --->s7				\If yes, the variable which counts the correct answers is increased in 1 unit
+				@NoFood: Set F=0;  --->s9				\If not, the variable which counts the correct answers is set to 0 and the timeout interval is set
+
+	s7,
+		0": On^Food; z^OnFood; --->s8				 		\Sugar pellet delivery - ON
+
+	s8,
+		0.1": Off^Food; z^OffFood; --->s9			 		\Sugar pellet delivery - OFF
+
+	s9,
+		0": IF E(1)>=^InitialPrime*0.001"*^maxPrimeTime [@freeze_prime, @continue] 	\Testing if the prime has reached maxPrimeTime (in units of 100ms)
+			@freeze_prime:  Set E(1)=^InitialPrime*0.001"*^maxPrimeTime; --->s3	\If yes, the prime doesn't change anymore and the prime time is set by ^maxPrimeTime (just to be sure)
+			@continue: --->s10												\If not, the prime still can be either increased or decreased
+
+	s10,
+		0": IF F>=5 [@Increment, @Keep]			                      					 		 \Phase test: Testing if the subject made 3 correct answers in a row
+				@Increment: Set E(1)=E(1)+^Increment*0.001", F=0; z^OnPhase_change; --->s3       \If yes, the prime time is incremented and F is set to 0
+				@Keep: --->s3							         	 					 		 \If not, the prime time keeps the same value
+
+\ *******************************************************************
+s.s.18,		\Control Flicker
+	s1,
+		.01": IF C=1 [@Flicker, @NoFlicker]
+			@Flicker: --->s2
+			@NoFlicker: --->s1
+
+	s2,
+		.5": On^HouseLight; --->s3
+
+	s3,
+		.5": Off^HouseLight; --->s1
+
+
+\s.s.19,		\Record all inputs
+\	s1,
+\		#R^L_Press:     Set A(Y) = BTIME-U + ^L_Press/^STORE; Add Y, B(^L_Press); --->s1
+\		#R^R_Press:     Set A(Y) = BTIME-U + ^R_Press/^STORE; Add Y, B(^R_Press); --->s1
+\		#R^L_Release:   Set A(Y) = BTIME-U + ^L_Release/^STORE; Add Y, B(^L_Release); --->s1
+\		#R^R_Release:   Set A(Y) = BTIME-U + ^R_Release/^STORE; Add Y, B(^R_Release); --->s1
+
+
+s.s.20,		\Trinomial variable for LEFT lever release: W(0)(0)=0 released; 1 first press; 2 still pressed
+	s1,
+		#R^L_Press: Set W(0)=1; Set A(Y) = BTIME-U + ^L_Press/^STORE; Add Y, B(^L_Press); --->s2
+
+	s2,
+		#R^L_Press:	Set W(0)=2; --->s2
+		0": Set W(0)=0; Set A(Y) = BTIME-U + ^L_Release/^STORE; Add Y, B(^L_Release); --->s1
+
+
+s.s.21,		\Trinomial variable for RIGHT lever release: W=0 released; 1 first press; 2 still pressed
+	s1,
+		#R^R_Press: Set W(0)=1; Set A(Y) = BTIME-U + ^R_Press/^STORE; Add Y, B(^R_Press); --->s2
+
+	s2,
+		#R^R_Press:	Set W(0)=2; --->s2
+		0": Set W(0)=0; Set A(Y) = BTIME-U + ^R_Release/^STORE; Add Y, B(^R_Release); --->s1
+
+s.s.22,		\Trinomial variable for Head-out: W(1)=0 head out; 1 first head entry; 2 head still in
+	s1,
+		#R^Head_in: Set W(1)=1; Set A(Y) = BTIME-U + ^Head_in/^STORE; Add Y, B(^Head_in); --->s2
+
+	s2,
+		#R^Head_in:	Set W(1)=2; --->s2
+		0": Set W(1)=0; Set A(Y) = BTIME-U + ^Head_out/^STORE; Add Y, B(^Head_out); --->s1
+
+
+s.s.24,		\L_Light state set
+	s1,
+		#z^OnL_Light		: Set A(Y)=BTIME-U+(^L_Light+^ON)/^STORE; Add Y,B(^L_Light+^ON); --->s1
+		#z^OffL_Light		: Set A(Y)=BTIME-U+(^L_Light+^OFF)/^STORE; Add Y,B(^L_Light+^OFF); --->s1
+
+
+s.s.25,		\R_Light state set
+	s1,
+		#z^OnR_Light		: Set A(Y)=BTIME-U+(^R_Light+^ON)/^STORE; Add Y,B(^R_Light+^ON); --->s1
+		#z^OffR_Light		: Set A(Y)=BTIME-U+(^R_Light+^OFF)/^STORE; Add Y,B(^R_Light+^OFF); --->s1
+
+
+s.s.26,		\HouseLight state set
+	s1,
+		#z^OnHouseLight     : Set A(Y)=BTIME-U+(^HouseLight+^ON)/^STORE; Add Y,B(^HouseLight+^ON); --->s1
+		#z^OffHouseLight    : Set A(Y)=BTIME-U+(^HouseLight+^OFF)/^STORE; Add Y,B(^HouseLight+^OFF); --->s1
+
+
+s.s.27,		\Food state set
+	s1,
+		#z^OnFood           : Set A(Y)=BTIME-U+(^Food+^ON)/^STORE; Add Y,B(^Food+^ON); --->s1
+		#z^OffFood          : Set A(Y)=BTIME-U+(^Food+^OFF)/^STORE; Add Y,B(^Food+^OFF); --->s1
+
+
+\ Record STATEs (state sets 26 - 29 available)
+s.s.28,		\Event codes for states start at 50
+	s1,
+		#z^StateEndSession	: Set A(Y)=BTIME-U+(^StateEndSession+^STATE)/^STORE; Add Y; --->s1
+
+s.s.29,		\Phase change
+	s1,
+		#z^OnPhase_change   : Set A(Y)=BTIME-U+(^Phase_change+^ON)/^STORE; Add Y,B(^Phase_change+^ON); --->s1
+		#z^OffPhase_change  : Set A(Y)=BTIME-U+(^Phase_change+^OFF)/^STORE; Add Y,B(^Phase_change+^OFF); --->s1
+
+s.s.30,		\Save Prime
+	s1,
+		#z^OnPrime    		: Set A(Y)=BTIME-U+(^Prime+^ON)/^STORE; Add Y,B(^Prime+^ON); --->s1
+
+s.s.31,		\Initialization
+	s1,
+		#Start: --->s2
+
+	s2,		\Show data (update every minute)
+        #K1 ! 1":  SHOW 1, Time (sec), (BTIME-U)/1";
+                   SHOW 2, Left Press, B(^L_Press);
+                   SHOW 3, Consec. Correct, F;
+                   SHOW 4, Phase advances, B(^Phase_change+^On);
+                   SHOW 5, Phase back, B(^Phase_change+^Off);
+				   Show 6, Curr. Prime (msec), E(1)*2;
+				   Show 7, Food, B(^Food+^On);--->s2
+
+s.s.32,		\End Session
+	s1,
+		#Start: Set U=BTIME; --->s2		\Change to s3 for condition alone
+
+	s2,
+		^SessionLength' ! #Z^StateEndSession ! #K99: #K1; --->s3
+
+	s3, \END SESSION
+		.01": Set A(Y)=-987.987; --->STOPABORTFLUSH
