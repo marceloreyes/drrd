@@ -9,6 +9,7 @@ def med2tec(fNAME,flag='A'):
         fid = open(fNAME, 'r')
     except IOError:
         print("Could not read file:", fName)
+        return([])
 
     ##cans the entire line in as a string, with spaces (to preserve number info)
     fileString = fid.readlines() 
