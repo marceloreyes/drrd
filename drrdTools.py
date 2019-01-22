@@ -281,11 +281,8 @@ def gatherDrrd(prefix='AB1',animalID=64,sessions=[1],plotFlag=True):
     # prefix = the code for the experiment
     # example: D = gatherDrrd('AB1',1,1:9,True)
     # runs the sessions 1 through 9 for animal 1 of the AB1 experiment.
-
-    prefix = 'AB1'
-    sessions = [1,2,3]
-    animalID = 64
-    plotFlag = True
+    import numpy as np
+    import matplotlib.pyplot as plt
 
     D = np.array([])  
     
