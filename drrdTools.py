@@ -45,8 +45,6 @@ def med2tec(fNAME,flag='A'):
 
     return(M)
 
-#_____________________________________________________________________
-
 def plotDrrd(D,title_label):
     # ___________________________________________________________________________________________
     # File:             plotDrrd.py
@@ -115,7 +113,7 @@ def plotDrrd(D,title_label):
     # --- printing the lines dividing the sessions ---
     div = np.where(np.diff(D[:,session]))[0]
     for i in range(len(div)):
-        plt.plot(plt.xlim,[div[i],div[i]])
+        plt.plot(plt.xlim(),[div[i],div[i]])
         
     # --- Plotting the moving average of the lever press durations ---
     #plot(movingAverage(D(:,1),20),1:N,'linewidth',2);
@@ -133,7 +131,6 @@ def plotDrrd(D,title_label):
     # --- mounting return variable ---
     return ([len(validPrimed)/N, len(validNonPrimed)/N, len(invalid)/N] *100)
 
-#___________________________________________________________________________
 def drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True):
     # Created on:       January, 14, 2019
     # Created by:       Marcelo Bussotti Reyes
@@ -278,4 +275,27 @@ def drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True):
     #np.save('D',D) # remove this
     #print(D)
     return(D)
+
+def gatherDrrd(prefix='AB1',animalID=64,sessions=[1],plotFlag=True):
+    # function D = gatherDrrd(prefix,animalID,sessions,plotFlag)
+    # prefix = the code for the experiment
+    # example: D = gatherDrrd('AB1',1,1:9,True)
+    # runs the sessions 1 through 9 for animal 1 of the AB1 experiment.
+
+    prefix = 'AB1'
+    sessions = [1,2,3]
+    animalID = 64
+    plotFlag = True
+
+    D = np.array([])  
+    
+    for k in sessions:
+        if len(D)>0:
+            D = np.vstack((D, drrd(prefix,animalID,k,plotFlag=False))) 
+        else:
+            D = drrd(prefix,animalID,k,plotFlag=False)
+
+
+    if plotFlag:
+        plotDrrd(D,title_label='Animal: '+str(animalID)+' sessions: '+str(sessions))
 
