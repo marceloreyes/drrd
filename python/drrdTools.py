@@ -70,10 +70,6 @@ def plotDrrd(D,title_label):
     # Format:           plotDrrd(D,'tittle label')
     # Example:          d = plotDrrd(D,'191014-Session1'); 
 
-    #if nargin == 1
-    #  title_label = [];
-    #end
-
     import numpy as np
     import matplotlib.pyplot as plt
 
@@ -105,7 +101,7 @@ def plotDrrd(D,title_label):
     #mycolor = [0,.8,.9]
     mysize  = 30
     lw      = 0.5
-    plt.scatter(D[validPrimed,0]   ,validPrimed,   s=mysize,  linewidths=lw, marker='o',c='w', edgecolors='k' )
+    plt.scatter(D[validPrimed,0]   ,validPrimed,   s=mysize,  linewidths=lw, marker='o',c='k', edgecolors='k' )
     plt.scatter(D[validNonPrimed,0],validNonPrimed,s=mysize,  linewidths=lw, marker='o',c='w', edgecolors='k' )
     plt.scatter(D[invalid,0]       ,       invalid,s=mysize,  linewidths=lw, marker='o',c='w', edgecolors='r' )
 
@@ -118,9 +114,8 @@ def plotDrrd(D,title_label):
     # --- Plotting the moving average of the lever press durations ---
     #plot(movingAverage(D(:,1),20),1:N,'linewidth',2);
 
-
     # --- setting up the scale and title ---
-    plt.xlim((0,5))
+    plt.xlim((0,3))
     plt.ylim((0,N+5))
     plt.xlabel('time (s)',fontsize=20)
     plt.ylabel('trial',fontsize=20)
@@ -131,7 +126,7 @@ def plotDrrd(D,title_label):
     # --- mounting return variable ---
     return ([len(validPrimed)/N, len(validNonPrimed)/N, len(invalid)/N] *100)
 
-def drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True):
+def drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True, dataPath='//home//mbreyes//ufabc//dados//AB//'):
     # Created on:       January, 14, 2019
     # Created by:       Marcelo Bussotti Reyes
     # Purpose:          A function that analyzes the performance of rats in the drrd
@@ -172,25 +167,26 @@ def drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True):
     validCol   = 3
     phaseCol   = 4
     sessionCol = 5              # session variable column index
+    primeTimeCol = 6            # duration between lever press and prime time for each trial
+    Ncols = 7
 
     dPh        = 0.1            # initiates the variable just in case it cannot be 
                                 # obtained from the data, as for example when no 
                                 # trials were primed (reinforced) in one session
 
-    data = med2tec(filename)    # reads data from medpc format to time-event code
+    data = med2tec(dataPath + filename)    # reads data from medpc format to time-event code
     data = np.array(data)
-
 
     if len(data) == 0:
         print('Empty file or file not found: no data analyzed\n')
-        #return([])        
+        return([])        
 
     # small correction for a bug in the med-pc file ---
     # if the animal presses the lever at the same cycle of the Start command in the
     # box, the first time can be registered wrong, so this sets it to zero as it 
     # should be
     if data[0,0] > data[1,0]:
-        data[1,1] = 0
+        data[0,0] = 0
         
     # --- look for indexes of temporal events ---
     #startIndex      = np.find(data[:,2]== 1)  
@@ -200,17 +196,16 @@ def drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True):
     lightOnIndex  = np.array([i for i in range(len(data)) if data[i,1] == 11]) # when light was turned on 
     lightOffIndex = np.array([i for i in range(len(data)) if data[i,1] == 21]) # when light was turned off
     phaseAdvIndex = np.array([i for i in range(len(data)) if data[i,1] == 17]) # indexes of trials where phase was advanced
-    phaseBckIndex = np.array([i for i in range(len(data)) if data[i,1] == 17]) # indexes of trials where phase was retreated
+    phaseBckIndex = np.array([i for i in range(len(data)) if data[i,1] == 27]) # indexes of trials where phase was retreated
 
     startIndex    = startIndex[range(len(endIndex))] #eliminates the last trial in case it was incomplete
 
     # --- searching for trials in which the animals received food. We call these "primed" ----
-    #primedTrials = findTrial(startIndex,primeIndex);
-    primedTrials = np.array([startIndex[startIndex<primeIndex[i]].size-1 for i in range(len(primeIndex))])
-
+    primedTrials = np.array([startIndex[startIndex<i].size-1 for i in primeIndex])
+    
     # --- searching for trials in which animals progressed or retreated phase
-    phaseAdvTrials = np.array([startIndex[startIndex<phaseAdvIndex[i]].size-1 for i in range(len(phaseAdvIndex))])
-    phaseBckTrials = np.array([startIndex[startIndex<phaseBckIndex[i]].size-1 for i in range(len(phaseBckIndex))]) 
+    phaseAdvTrials = np.array([startIndex[startIndex<i].size-1 for i in phaseAdvIndex])
+    phaseBckTrials = np.array([startIndex[startIndex<i].size-1 for i in phaseBckIndex]) 
 
     # --- searching for trials in which the animals responded with the light on 
     # (not in timeout). We'll call these trials "valid". 
@@ -232,6 +227,7 @@ def drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True):
         #print(validTrials.size,Nu.size,Nv.size)
         validTrials = np.hstack([validTrials,range(Nu,Nv)])
 
+    validTrials = np.array(validTrials)
     # --- search for valid trials in which animals were and were not reinforded ---
     validPrimed    = np.intersect1d(validTrials,primedTrials)
     validNonPrimed = np.setdiff1d  (validTrials,primedTrials)
@@ -244,19 +240,25 @@ def drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True):
         iniPh = 1.2
         print('Warning: initial criterion cound not be retrieved from file, assumed 1.2 s')
 
-
-    D = np.zeros(len(startIndex)*6)    # initiates the vector for includind the data     
-
     # --- Organizing data in one single matriz: D --- 
-    D = np.zeros((len(startIndex),6))             # Initiates the vector for speed
+    D = np.zeros((len(startIndex),Ncols))             # Initiates the vector for speed
 
     # --- Calculating the duration of the lever presses ---
     D[:  , dtCol]               = data[endIndex,0] - data[startIndex,0]
     D[:-1,itiCol]               = data[startIndex[1:],0] - data[endIndex[:-1],0]
     D[-1 ,itiCol]               = np.nan
+    
+    # Now we are 
+    D[primedTrials,primeTimeCol]= data[primeIndex,0] - data[primeIndex-1,0]
+    
 
+    #print(len(validTrials))
+    #print(len(startIndex))
     if len(primedTrials)>0: D[primedTrials,primedCol]   = 1  # sets to 1 all the trials that were primed
-    if len(validTrials) >0: D[validTrials , validCol]   = 1  # sets to 1 all the trials that were primed
+
+    if len(validTrials) >0:
+        for k in validTrials: D[int(k),validCol]   = 1
+        #D[np.array(validTrials) , validCol]   = 1  # sets to 1 all the trials that were primed
     if len(phaseAdvTrials)>0: D[phaseAdvTrials,phaseCol]  =  dPh
     if len(phaseBckTrials)>0: D[phaseBckTrials,phaseCol]  = -dPh
 
