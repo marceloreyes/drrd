@@ -11,7 +11,7 @@ def med2tec(fNAME,flag='A'):
         print("Could not read file:", fNAME)
         return([])
 
-    ##cans the entire line in as a string, with spaces (to preserve number info)
+    ##reads the entire line in as a string, with spaces (to preserve number info)
     fileString = fid.readlines() 
 
     # looking for the line positions that contain the string
@@ -90,7 +90,7 @@ def plotDrrd(D,title_label):
     invalid        = [i for i in range(N) if D[i,valid]==0] 
 
     # --- plotting the prime times ---
-    plt.plot(D[:,primeT],range(N))#,'r','linewidth', 1.5);
+    #plt.plot(D[:,primeT],range(N))#,'r','linewidth', 1.5);
 
     # --- alternative: patch ---
     #patch([ D(:,5); D(end,5); 0.00; 0.00], [1:N N+5 N+5 0], [.7 .8 .7] ,'EdgeColor' ,'none');% % [.7 .8 .7]
@@ -122,7 +122,7 @@ def plotDrrd(D,title_label):
     plt.title(title_label,fontsize=22)
 
     plt.show()
-    plt.ion()
+    #plt.ion()
     # --- mounting return variable ---
     return ([len(validPrimed)/N, len(validNonPrimed)/N, len(invalid)/N] *100)
 
