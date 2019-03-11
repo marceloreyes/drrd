@@ -73,9 +73,6 @@ def plotDrrd(D,title_label):
     import numpy as np
     import matplotlib.pyplot as plt
 
-
-    #D = np.load('D.npy')
-
     primed  = 2
     valid   = 3
     primeT  = 4
@@ -84,14 +81,15 @@ def plotDrrd(D,title_label):
     N = D.shape[0]
 
     # --- looking for the specific trials ---
-    #validPrimed    =  find(D(:,primed)==1 	& D(:,valid)==1);
     validPrimed    = [i for i in range(N) if (D[i,primed]==1 and D[i,valid]==1)]
     validNonPrimed = [i for i in range(N) if (D[i,primed]==0 and D[i,valid]==1)]
     invalid        = [i for i in range(N) if D[i,valid]==0] 
 
     # --- plotting the prime times ---
-    #plt.plot(D[:,primeT],range(N))#,'r','linewidth', 1.5);
-
+    #plt.plot(D[:,primeT],range(N),'r','linewidth', 5.5)
+    #plt.plot([1.5]*N,[i for i in range(1,N+1)],'b','linewidth', 1.5)
+    plt.plot(D[:,primeT],range(N),'b','linewidth', 1)
+    
     # --- alternative: patch ---
     #patch([ D(:,5); D(end,5); 0.00; 0.00], [1:N N+5 N+5 0], [.7 .8 .7] ,'EdgeColor' ,'none');% % [.7 .8 .7]
     #patch([ D(:,5); D(end,5); 0.00; 0.00], [1:N N+5 N+5 0], [0 110 144]/255 ,'EdgeColor' ,'none');% % [.7 .8 .7]
@@ -101,7 +99,7 @@ def plotDrrd(D,title_label):
     #mycolor = [0,.8,.9]
     mysize  = 30
     lw      = 0.5
-    plt.scatter(D[validPrimed,0]   ,validPrimed,   s=mysize,  linewidths=lw, marker='o',c='k', edgecolors='k' )
+    plt.scatter(D[validPrimed,0]   ,validPrimed,   s=mysize,  linewidths=lw, marker='o',c=[.8,.8,.8], edgecolors='k' )
     plt.scatter(D[validNonPrimed,0],validNonPrimed,s=mysize,  linewidths=lw, marker='o',c='w', edgecolors='k' )
     plt.scatter(D[invalid,0]       ,       invalid,s=mysize,  linewidths=lw, marker='o',c='w', edgecolors='r' )
 
@@ -120,9 +118,10 @@ def plotDrrd(D,title_label):
     plt.xlabel('time (s)',fontsize=20)
     plt.ylabel('trial',fontsize=20)
     plt.title(title_label,fontsize=22)
+    plt.xticks(ticks=[1,2,3],labels=[1,2,3])
 
     plt.show()
-    #plt.ion()
+    plt.ion()
     # --- mounting return variable ---
     return ([len(validPrimed)/N, len(validNonPrimed)/N, len(invalid)/N] *100)
 
@@ -167,12 +166,7 @@ def drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True, dataPath='//h
     validCol   = 3
     phaseCol   = 4
     sessionCol = 5              # session variable column index
-    primeTimeCol = 6            # duration between lever press and prime time for each trial
     Ncols = 7
-
-    dPh        = 0.1            # initiates the variable just in case it cannot be 
-                                # obtained from the data, as for example when no 
-                                # trials were primed (reinforced) in one session
 
     data = med2tec(dataPath + filename)    # reads data from medpc format to time-event code
     data = np.array(data)
@@ -199,6 +193,12 @@ def drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True, dataPath='//h
     phaseBckIndex = np.array([i for i in range(len(data)) if data[i,1] == 27]) # indexes of trials where phase was retreated
 
     startIndex    = startIndex[range(len(endIndex))] #eliminates the last trial in case it was incomplete
+    
+    # --- checking if there was at least one trial, 
+    # --- otherwise stops the routine end return empty vector
+    if len(startIndex) == 0: 
+        print('No trials recorded')
+        return([])  
 
     # --- searching for trials in which the animals received food. We call these "primed" ----
     primedTrials = np.array([startIndex[startIndex<i].size-1 for i in primeIndex])
@@ -207,24 +207,20 @@ def drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True, dataPath='//h
     phaseAdvTrials = np.array([startIndex[startIndex<i].size-1 for i in phaseAdvIndex])
     phaseBckTrials = np.array([startIndex[startIndex<i].size-1 for i in phaseBckIndex]) 
 
-    # --- searching for trials in which the animals responded with the light on 
-    # (not in timeout). We'll call these trials "valid". 
-    #validTrials     = findValidTrial(startIndex,lightOnIndex,lightOffIndex);
-
+    # completing data in case the lightOff event wasn't found
+    # includes a lightOff event in the last trial
     if len(lightOnIndex)!= len(lightOffIndex):
         if len(lightOnIndex) == len(lightOffIndex)+1:
-            #print(startIndex[-1])
-            lightOffIndex = np.append(lightOffIndex,startIndex[-1]+1)
+                lightOffIndex = np.append(lightOffIndex,startIndex[-1]+1)
         else: 
             print('Incompatible number of events')
-            #exit(-2)
+            return(-2)
 
 
     validTrials = np.array([], dtype=np.int64).reshape(0,)
     for i in range(len(lightOnIndex)):
         Nu = np.array(len(startIndex[startIndex<lightOnIndex[i] ]))
         Nv = np.array(len(startIndex[startIndex<lightOffIndex[i]]))
-        #print(validTrials.size,Nu.size,Nv.size)
         validTrials = np.hstack([validTrials,range(Nu,Nv)])
 
     validTrials = np.array(validTrials)
@@ -234,11 +230,12 @@ def drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True, dataPath='//h
     invalid        = np.setdiff1d  (range(len(startIndex)), validTrials)
 
     # --- gets the initial prime time ---
-    if len(primeIndex) >= 1:
-        iniPh = data[primeIndex[0],0] - data[primeIndex[0]-1,0]
-    else:
-        iniPh = 1.2
-        print('Warning: initial criterion cound not be retrieved from file, assumed 1.2 s')
+    #if len(primeIndex) >= 1:
+    #    iniPh = data[primeIndex[0],0] - data[primeIndex[0]-1,0]
+    #else:
+    #    iniPh = 1.2
+    #    print('Warning: initial criterion cound not be retrieved from file, assumed 1.2 s')
+
 
     # --- Organizing data in one single matriz: D --- 
     D = np.zeros((len(startIndex),Ncols))             # Initiates the vector for speed
@@ -248,23 +245,31 @@ def drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True, dataPath='//h
     D[:-1,itiCol]               = data[startIndex[1:],0] - data[endIndex[:-1],0]
     D[-1 ,itiCol]               = np.nan
     
-    # Now we are 
-    D[primedTrials,primeTimeCol]= data[primeIndex,0] - data[primeIndex-1,0]
-    
-
-    #print(len(validTrials))
-    #print(len(startIndex))
+    # --- saving each data in respective column
     if len(primedTrials)>0: D[primedTrials,primedCol]   = 1  # sets to 1 all the trials that were primed
-
+    
     if len(validTrials) >0:
         for k in validTrials: D[int(k),validCol]   = 1
-        #D[np.array(validTrials) , validCol]   = 1  # sets to 1 all the trials that were primed
-    if len(phaseAdvTrials)>0: D[phaseAdvTrials,phaseCol]  =  dPh
-    if len(phaseBckTrials)>0: D[phaseBckTrials,phaseCol]  = -dPh
+    
+    if len(phaseAdvTrials)>0: D[phaseAdvTrials,phaseCol]  =  1
+    if len(phaseBckTrials)>0: D[phaseBckTrials,phaseCol]  = -1
 
-    D[:,phaseCol]               = np.cumsum(D[:,phaseCol])+iniPh
+    #D[:,phaseCol]               = np.cumsum(D[:,phaseCol])+iniPh
     D[:,sessionCol]             = session        # adds the session number to data (same for all lines)
 
+    # Getting the time where the rats exceeded the criterion time
+    # these are called primed trials, and occurr at the prime time.
+    # we can get the primed times by subtracting the data where the prime happened 
+    # from the event before, which necessarily is the lever press
+    primeTimes = [0]*D.shape[0]
+    
+    for primed in primedTrials: 
+        thisIndex = startIndex[primed]
+        primeTimes[primed] = np.round(data[thisIndex+1,0]-data[thisIndex,0],decimals=5)
+
+    crit = extractCriterion(phAdv=D[:,phaseCol],primed=D[:,primedCol],primeTimes=primeTimes)
+    D[:,phaseCol] = crit
+    
     # --- printing output with the summary of the results ---
     print(f'Rat{D.shape[0]}  Trials:{len(startIndex)}  Reinforced:{len(validPrimed)}  Non-Reinforced:{len(validNonPrimed)}  Invalid:{len(invalid)}\n')
 
@@ -273,10 +278,75 @@ def drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True, dataPath='//h
     if plotFlag:
         plotDrrd(D,filename)
 
-
-    #np.save('D',D) # remove this
-    #print(D)
     return(D)
+
+def extractCriterion(phAdv,primed,primeTimes):
+
+    def fixPrimeTime(ptvalues): # for each prime time value
+        print('Trying to fix inconsistencies in prime times')
+        
+        # first let'see if there are values close to zero
+        t = [t for t in ptvalues if t>0.1]
+        
+        # second, values that are too close
+        t = [round(k,1) for k in t]             # narrows down to round values
+        t = list(set(t))                        # and eliminate the values that are equal
+        if len(t) == 1:     
+            print('Successfully fixed')
+            print(t)
+            return(t[0])
+        else: 
+            print('Unable to fix')           
+            return([])
+
+    def getPrimeTimes(i,j,x):
+        subset = list(set(x[i:j])) # find the unique values in the list x
+        subset.sort()              # organizes starting from zero
+        
+        if len(subset) > 2:        # there can be only zero and the prime time. 
+            print("Warning: More than one prime time found:",subset[1:])
+            return(fixPrimeTime(subset[1:]))             # If there are more - something is wrong - return empty vector
+        elif len(subset) == 2:     # if there are two, values are probably correct 
+            #TODO: here there is a loose end: there can be two values but one of them not be zero!!!
+            return subset[1]       # return the last value of the list (the positive value)
+        elif int(subset[0])==0:    # if there are only zeros in the list
+            #print("subset=0",subset)
+            return(-1)             # no way to determine the prime time: returns -1
+        else:                      # if  there is one non-zero value, all trials were primed
+            print("else:",subset)
+            return(subset[0])      # return the prime time
+            
+    newPrimeTimes = primeTimes.copy() # make a copy of prime time to return later
+
+    if len(phAdv)==len(primed)==len(primeTimes):         # checks if all vectors are of the same size
+
+        ind = [i+1 for i,j in enumerate(phAdv) if j==1]  # gets trials indices to find the trials of phase advance
+        ind = [0]+ind+[len(phAdv)]                       # add the beginning and the end indices 
+        ind = list(set(ind))                             # eliminates redundancies - incase the animal advanced in the very last trial, for example
+        ind.sort()
+
+        for i,j in zip(ind[0:-1],ind[1:]):               # loop for initial and final indices for each phase
+            
+            pt = getPrimeTimes(i,j,primeTimes)           # get the prime time for the trials and checks for inconsistencies
+            
+            if not pt:                                   # if the prime time is empty, smthg is wrong 
+                print("inconsistency found") 
+                print("i, j = ",i,j)            # alert user!
+                newPrimeTimes = [0]*len(phAdv)           # make all values equal to zero  
+                break
+            elif pt == -1:                               # if there were no correct trials 
+                if i > 0:                                # and if it is not first phase
+                    pt = newPrimeTimes[i-1]              # gets the same criterion as last phase
+                else:                                    # if it is first phase, just make it zero
+                    pt = 0
+            for k in range(i,j):                         # finally uniformizes all values in the phase
+                newPrimeTimes[k]=pt
+
+    else:
+        print("vectors are not of the same size")
+        print(len(phAdv))
+        newPrimeTimes = [0]*len(phAdv)                   # make all values equal to zero  
+    return(newPrimeTimes)
 
 def gatherDrrd(prefix='AB1',animalID=64,sessions=[1],plotFlag=True):
     # function D = gatherDrrd(prefix,animalID,sessions,plotFlag)
