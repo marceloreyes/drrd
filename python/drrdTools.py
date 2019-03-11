@@ -99,7 +99,7 @@ def plotDrrd(D,title_label):
     #mycolor = [0,.8,.9]
     mysize  = 30
     lw      = 0.5
-    plt.scatter(D[validPrimed,0]   ,validPrimed,   s=mysize,  linewidths=lw, marker='o',c=[.8,.8,.8], edgecolors='k' )
+    plt.scatter(D[validPrimed,0]   ,validPrimed,   s=mysize,  linewidths=lw, marker='o',c='grey', edgecolors='k' )
     plt.scatter(D[validNonPrimed,0],validNonPrimed,s=mysize,  linewidths=lw, marker='o',c='w', edgecolors='k' )
     plt.scatter(D[invalid,0]       ,       invalid,s=mysize,  linewidths=lw, marker='o',c='w', edgecolors='r' )
 
@@ -125,7 +125,7 @@ def plotDrrd(D,title_label):
     # --- mounting return variable ---
     return ([len(validPrimed)/N, len(validNonPrimed)/N, len(invalid)/N] *100)
 
-def drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True, dataPath='//home//mbreyes//ufabc//dados//AB//'):
+def drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True, dataPath=''):
     # Created on:       January, 14, 2019
     # Created by:       Marcelo Bussotti Reyes
     # Purpose:          A function that analyzes the performance of rats in the drrd
@@ -135,7 +135,12 @@ def drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True, dataPath='//h
     # Input:            File name prefix as a string, animal id as a number and 
     #					session as a number. Filene name are in the format:
     #					[prefix00A.00S] where A is the animal and S is the sesson 
-    #
+    #     prefix:       usually two letters and a digit, e.g. AB0
+    #     animalID:     the number of the rat whose data you want to analyze
+    #     session:      is the number of the session to be analyzed (starts in 1)
+    #     plotFlag:     True if one desires to plot the results False otherwise
+    #     dataPath:     path to where the data is. Default is the current directory
+    #  
     # Output:           D, a matrix with 6 columns containing data from a trial in 
     #					each line.
     #                   In case saveMatFlag is parsed as true, the program will
@@ -144,7 +149,7 @@ def drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True, dataPath='//h
     # Coments:          Uses functions: med2tec.m, and plotDrrd.m
     #
     # Format:           drrd(prefix,animalID,session))
-    # Example:          D = drrd('AB1',1,2'); 
+    # Example:          D = drrd('AB1',1,2); 
     #					this will analyze the file AB1001.002, animal 1 and session 2 
     # Previous Modifications:
     # Modification:     Included the option of saving a matlab file with the
@@ -348,7 +353,7 @@ def extractCriterion(phAdv,primed,primeTimes):
         newPrimeTimes = [0]*len(phAdv)                   # make all values equal to zero  
     return(newPrimeTimes)
 
-def gatherDrrd(prefix='AB1',animalID=64,sessions=[1],plotFlag=True):
+def gatherDrrd(prefix='AB1',animalID=64,sessions=[1],plotFlag=True, dataPath=''):
     # function D = gatherDrrd(prefix,animalID,sessions,plotFlag)
     # prefix = the code for the experiment
     # example: D = gatherDrrd('AB1',1,1:9,True)
@@ -360,9 +365,9 @@ def gatherDrrd(prefix='AB1',animalID=64,sessions=[1],plotFlag=True):
     
     for k in sessions:
         if len(D)>0:
-            D = np.vstack((D, drrd(prefix,animalID,k,plotFlag=False))) 
+            D = np.vstack((D, drrd(prefix,animalID,k,plotFlag=False,dataPath=dataPath))) 
         else:
-            D = drrd(prefix,animalID,k,plotFlag=False)
+            D = drrd(prefix,animalID,k,plotFlag=False,dataPath=dataPath)
 
 
     if plotFlag:
