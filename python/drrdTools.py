@@ -45,30 +45,30 @@ def med2tec(fNAME,flag='A'):
 
     return(M)
 
-def plotDrrd(D,title_label):
+def plotDrrd(D,title_label='Title_Label'):
     # ___________________________________________________________________________________________
-    # File:             plotDrrd.py
-    # File type:        Function
-    # Created on:       January, 14, 2019
-    # Created by:       Marcelo Bussotti Reyes
-    # Purpose:          A function that analyzes the performance of rats in the drrd
-    #                   procedure by plotting the trials 
-    #
-    # Input:            A matrix with 6 columns of data according to 
-    #                   the one produced by the function drrd.
-    #                   Each line of the matrix D is a trial
-    #                   Column 0 is the duration of the lever press
-    #                   Column 1 is the the time between the lever release and the next lever press (ITI)
-    #                   Column 2 is 1 for the reinforced trials
-    #                   Column 3 is 1 for trials where the light was on (valid trials)
-    #                   Column 4 shows the criterion (prime time) for each trial
-    #                   Column 5 is the session number
-    #
-    # Output:           A plot of the data contained in D and some statistics
-    #
-    #
-    # Format:           plotDrrd(D,'tittle label')
-    # Example:          d = plotDrrd(D,'191014-Session1'); 
+        # File:             plotDrrd.py
+        # File type:        Function
+        # Created on:       January, 14, 2019
+        # Created by:       Marcelo Bussotti Reyes
+        # Purpose:          A function that analyzes the performance of rats in the drrd
+        #                   procedure by plotting the trials 
+        #
+        # Input:            A matrix with 6 columns of data according to 
+        #                   the one produced by the function drrd.
+        #                   Each line of the matrix D is a trial
+        #                   Column 0 is the duration of the lever press
+        #                   Column 1 is the the time between the lever release and the next lever press (ITI)
+        #                   Column 2 is 1 for the reinforced trials
+        #                   Column 3 is 1 for trials where the light was on (valid trials)
+        #                   Column 4 shows the criterion (prime time) for each trial
+        #                   Column 5 is the session number
+        #
+        # Output:           A plot of the data contained in D and some statistics
+        #
+        #
+        # Format:           plotDrrd(D,'tittle label')
+        # Example:          d = plotDrrd(D,'191014-Session1'); 
 
     import numpy as np
     import matplotlib.pyplot as plt
@@ -77,7 +77,6 @@ def plotDrrd(D,title_label):
     valid   = 3
     primeT  = 4
     session = 5 	# column with the session number
-
     N = D.shape[0]
 
     # --- looking for the specific trials ---
@@ -86,9 +85,18 @@ def plotDrrd(D,title_label):
     invalid        = [i for i in range(N) if D[i,valid]==0] 
 
     # --- plotting the prime times ---
+    plt.plot(D[:,primeT],range(N),'grey',linewidth=2)
+
+    # --- setting up the scale and title ---
+    xmax = np.round(np.mean(D[:,0])+ 4*np.std(D[:,0]))
+    plt.xlim((0,xmax))
+    plt.ylim((0,N+5))
+    plt.xlabel('time (s)',fontsize=20)
+    plt.ylabel('trial',fontsize=20)
+    plt.title(title_label,fontsize=22)
+
     #plt.plot(D[:,primeT],range(N),'r','linewidth', 5.5)
-    #plt.plot([1.5]*N,[i for i in range(1,N+1)],'b','linewidth', 1.5)
-    plt.plot(D[:,primeT],range(N),'b','linewidth', 1)
+    #plt.plot([1.5]*N,[i for i in range(1,N+1)],'b','linewidth', 1.5)   
     
     # --- alternative: patch ---
     #patch([ D(:,5); D(end,5); 0.00; 0.00], [1:N N+5 N+5 0], [.7 .8 .7] ,'EdgeColor' ,'none');% % [.7 .8 .7]
@@ -97,28 +105,35 @@ def plotDrrd(D,title_label):
 
     # --- Plotting each trial in a different style ---
     #mycolor = [0,.8,.9]
-    mysize  = 30
-    lw      = 0.5
-    plt.scatter(D[validPrimed,0]   ,validPrimed,   s=mysize,  linewidths=lw, marker='o',c='grey', edgecolors='k' )
-    plt.scatter(D[validNonPrimed,0],validNonPrimed,s=mysize,  linewidths=lw, marker='o',c='w', edgecolors='k' )
-    plt.scatter(D[invalid,0]       ,       invalid,s=mysize,  linewidths=lw, marker='o',c='w', edgecolors='r' )
-
+    mysize  = 50
+    lw      = 1
+    color   = 'white'
+    plt.scatter(D[validPrimed,0]   ,validPrimed,   s=mysize,  linewidths=lw, marker='o',c=color, edgecolors='k' )
+    plt.scatter(D[validNonPrimed,0],validNonPrimed,s=mysize,  linewidths=lw, marker='o',c=color, edgecolors='k' )
+    plt.scatter(D[invalid,0]       ,       invalid,s=mysize,  linewidths=lw, marker='o',c=color, edgecolors='r' )
 
     # --- printing the lines dividing the sessions ---
     div = np.where(np.diff(D[:,session]))[0]
-    for i in range(len(div)):
-        plt.plot(plt.xlim(),[div[i],div[i]])
-        
+    for i in div:
+        plt.plot(plt.xlim(),[div,div])
+
+    # --- Plotting the response distributions ---
+    xmi = 0 
+    xma = np.round(np.mean(D[:,0])+4*np.std(D[:,0]))
+    Nx_grid = 100
+
+    x_grid = np.linspace(xmi, xma, Nx_grid)
+    split = True
+    thisKDE = KDE(D[:,0], x_grid, split=split)
+    if not split:
+        #plt.plot(x_grid,thisKDE,)
+        plt.plot(x_grid,thisKDE,color='blue',alpha=0.5,lw=4)
+    else: 
+        for i in range(0,2):
+            plt.plot(x_grid,thisKDE[i],alpha=0.5,lw=4)
+    #plt.fill(,thisKDE,color='blue',alpha=0.5,lw=3,baseline=0)
     # --- Plotting the moving average of the lever press durations ---
     #plot(movingAverage(D(:,1),20),1:N,'linewidth',2);
-
-    # --- setting up the scale and title ---
-    plt.xlim((0,3))
-    plt.ylim((0,N+5))
-    plt.xlabel('time (s)',fontsize=20)
-    plt.ylabel('trial',fontsize=20)
-    plt.title(title_label,fontsize=22)
-    plt.xticks(ticks=[1,2,3],labels=[1,2,3])
 
     plt.show()
     plt.ion()
@@ -126,39 +141,39 @@ def plotDrrd(D,title_label):
     return ([len(validPrimed)/N, len(validNonPrimed)/N, len(invalid)/N] *100)
 
 def drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True, dataPath=''):
-    # Created on:       January, 14, 2019
-    # Created by:       Marcelo Bussotti Reyes
-    # Purpose:          A function that analyzes the performance of rats in the drrd
-    #                   procedure. The animals are supposed to press a lever for a
-    #					duration longer than the prime time in order to receive food.
-    #
-    # Input:            File name prefix as a string, animal id as a number and 
-    #					session as a number. Filene name are in the format:
-    #					[prefix00A.00S] where A is the animal and S is the sesson 
-    #     prefix:       usually two letters and a digit, e.g. AB0
-    #     animalID:     the number of the rat whose data you want to analyze
-    #     session:      is the number of the session to be analyzed (starts in 1)
-    #     plotFlag:     True if one desires to plot the results False otherwise
-    #     dataPath:     path to where the data is. Default is the current directory
-    #  
-    # Output:           D, a matrix with 6 columns containing data from a trial in 
-    #					each line.
-    #                   In case saveMatFlag is parsed as true, the program will
-    #                   save a matlab file (.mat) with the same name as the
-    #                   original data file.
-    # Coments:          Uses functions: med2tec.m, and plotDrrd.m
-    #
-    # Format:           drrd(prefix,animalID,session))
-    # Example:          D = drrd('AB1',1,2); 
-    #					this will analyze the file AB1001.002, animal 1 and session 2 
-    # Previous Modifications:
-    # Modification:     Included the option of saving a matlab file with the
-    #                   matrix D. This helps to speed up the analysis when
-    #                   several sessions and animals are to be analyzed.
-    #                   Included session column (6th) and the input format
-    #                   (Marcelo B. Reyes 2013)
+    # ________________________________________________________
+        # Created on:       January, 14, 2019
+        # Created by:       Marcelo Bussotti Reyes
+        # Purpose:          A function that analyzes the performance of rats in the drrd
+        #                   procedure. The animals are supposed to press a lever for a
+        #					duration longer than the prime time in order to receive food.
+        #
+        # Input:            File name prefix as a string, animal id as a number and 
+        #					session as a number. Filene name are in the format:
+        #					[prefix00A.00S] where A is the animal and S is the sesson 
+        #     prefix:       usually two letters and a digit, e.g. AB0
+        #     animalID:     the number of the rat whose data you want to analyze
+        #     session:      is the number of the session to be analyzed (starts in 1)
+        #     plotFlag:     True if one desires to plot the results False otherwise
+        #     dataPath:     path to where the data is. Default is the current directory
+        #  
+        # Output:           D, a matrix with 6 columns containing data from a trial in 
+        #					each line.
+        #                   In case saveMatFlag is parsed as true, the program will
+        #                   save a matlab file (.mat) with the same name as the
+        #                   original data file.
+        # Coments:          Uses functions: med2tec.m, and plotDrrd.m
+        #
+        # Format:           drrd(prefix,animalID,session))
+        # Example:          D = drrd('AB1',1,2); 
+        #					this will analyze the file AB1001.002, animal 1 and session 2 
+        # Previous Modifications:
+        # Modification:     Included the option of saving a matlab file with the
+        #                   matrix D. This helps to speed up the analysis when
+        #                   several sessions and animals are to be analyzed.
+        #                   Included session column (6th) and the input format
+        #                   (Marcelo B. Reyes 2013)
 
-    #from drrdTools import med2tec
     import numpy as np
 
     # builds file name from parsed parameters - uses zfill to pad with zeros
@@ -276,13 +291,14 @@ def drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True, dataPath=''):
     D[:,phaseCol] = crit
     
     # --- printing output with the summary of the results ---
-    print(f'Rat{D.shape[0]}  Trials:{len(startIndex)}  Reinforced:{len(validPrimed)}  Non-Reinforced:{len(validNonPrimed)}  Invalid:{len(invalid)}\n')
+    print(f'Rat{animalID}  Trials:{len(startIndex)}  Reinforced:{len(validPrimed)}  Non-Reinforced:{len(validNonPrimed)}  Invalid:{len(invalid)}\n')
 
 
     # --- graphical part ---
     if plotFlag:
         plotDrrd(D,filename)
 
+    # --- returning results ---    
     return(D)
 
 def extractCriterion(phAdv,primed,primeTimes):
@@ -315,10 +331,8 @@ def extractCriterion(phAdv,primed,primeTimes):
             #TODO: here there is a loose end: there can be two values but one of them not be zero!!!
             return subset[1]       # return the last value of the list (the positive value)
         elif int(subset[0])==0:    # if there are only zeros in the list
-            #print("subset=0",subset)
             return(-1)             # no way to determine the prime time: returns -1
         else:                      # if  there is one non-zero value, all trials were primed
-            print("else:",subset)
             return(subset[0])      # return the prime time
             
     newPrimeTimes = primeTimes.copy() # make a copy of prime time to return later
@@ -372,4 +386,66 @@ def gatherDrrd(prefix='AB1',animalID=64,sessions=[1],plotFlag=True, dataPath='')
 
     if plotFlag:
         plotDrrd(D,title_label='Animal: '+str(animalID)+' sessions: '+str(sessions))
+    
+    return(D)
 
+def evaluateKDE(x,x_grid,bw=0.2):
+    
+    from statsmodels.nonparametric.kde import KDEUnivariate
+
+    kde = KDEUnivariate(x)
+    kde.fit(bw=bw)
+    return(kde.evaluate(x_grid))
+
+def scaleKDE(x,y,scale=''):
+    # determines the amplitude of the KDE to fit to the graph range (y-axis)
+    # usually it will scale to the number of trials
+    import numpy as np
+
+    if scale == '': scale = len(x)
+
+    factor = scale/np.max(y)
+    return(y*factor)
+
+def KDE(x,x_grid = range(0,8), bw=0.25, split=True, NSplit=100): 
+    # function that calculates the kernel density estimate
+    # parameters: 
+    #   xmi,xma = minimum (maximum) value of the range for x_grid
+    #   Nx_grid   = number of x_grid for kernel estimation
+    #   bw      = width of the kernel
+    #   split   = True if the routine splits in two phases, beginning and end of the session
+    #   plotFlag= True to also print output to a graph otherwise just return the calculations
+    #   Nsplit  = number of trials to use at the beginning and end of the session    
+        
+    import numpy as np
+
+    if 2*NSplit > len(x): 
+        NSplit =  np.floor(len(x)/2)
+        print('Number of trials to split too large, trials split in half')
+
+    if not split:
+        y = evaluateKDE(x,x_grid,bw=bw)
+        return(scaleKDE(x,y))
+    else:
+        xSplit =  x[0:NSplit]
+        y = evaluateKDE(xSplit,x_grid,bw=0.2)
+        yscaled1 = scaleKDE(xSplit,y,scale = len(x))
+
+        xSplit =  x[-NSplit-1:-1]
+        y = evaluateKDE(xSplit,x_grid,bw=0.2)
+        yscaled2 = scaleKDE(xSplit,y,scale = len(x)) 
+    
+        return([yscaled1,yscaled2])
+
+
+    
+'''
+def movingAverage(x,N=20):
+    
+    if len(x) > 2*N: 
+        initialValue = x[0]
+        for i,k in enumerate(x):
+            [ 
+    else:
+        print('Not enough data for printing moving average')
+'''
