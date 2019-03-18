@@ -3,8 +3,8 @@
 \ Created by:        Marcelo S. Caetano / Marcelo B. Reyes / Diego H. Miranda
 \ Created on:        Oct 09, 2013
 \ Last modified by:  Diego Miranda
-\ Last modified on:  
-\ Modification:      
+\ Last modified on:
+\ Modification:
 \
 \ Experiment:        Differential Reinforcement of Response Duration (DRRD) without Time Out and no phase back
 \ Duration:          60 minutes
@@ -14,7 +14,7 @@
 \
 \ Procedure:
 \ TBD
-\ 
+\
 \
 \ Definition of the inputs (from rat)
 \                       Event Code
@@ -57,10 +57,10 @@
 
 
 \ Constants for current experiment
-^sessionLength = 50   \ session length in minutes (e.g., 60 minutes) 
+^sessionLength = 60   \ session length in minutes (e.g., 60 minutes)
 ^InitialPrime = 100   \ Intial prime value (in ms) - ALL CONSTANTS MUST BE INTEGER
 ^Increment = 500      \ Prime increment    (in ms) - ALL CONSTANTS MUST BE INTEGER
-^maxPrimeTime = 50    \maximal time the lever needs to be held (in units of 100ms: 50 = 5000ms).
+^maxPrimeTime = 100    \maximal time the lever needs to be held (in units of 100ms: 50 = 5000ms).
 
 \ STATE constants
 ^StateEndSession = 32		\ Event Code on Disk is (32+^STATE)/^STORE = .061
@@ -95,7 +95,7 @@ DIM A=20000, B=30, T=3, D=2, E=1 \Check that variable A is the correct one
 	\S -
 	\T - Variable for time
 	\U - Session start time
-	\V - 
+	\V -
 	\W - Variable used to record lever releases
 	\X -
 	\Y - Index counts number of time-stamped events
@@ -115,39 +115,39 @@ s.s.1,
 
 	s2,
 		30": Set E(1)=E(0); On^L_Light; z^OnL_Light; ---> s3 			  \The first current prime time is defined and The Left Light is turned on
-		
-	s3,	
+
+	s3,
 		#R^L_Press: Set D(1) = BTIME; --->s4      						  \When the Left Lever is pressed, the variable D(1) assumes the current time value
-		
+
 	s4,
 		#R^L_Press: Set D(0) = BTIME;							  		  \Checking if the lever is still pressed
 		IF (D(0)-D(1) >= E(1)) and (H=0)  [@SavePrime, @Ignore]			  \Testing if the prime time was reached
 			@SavePrime: z^OnPrime; set H=1 --->s4						  \If yes, that time is saved
 			@Ignore: --->s4												  \If not, that time is not saved
 		0": Set D(2) = BTIME; Set H=0; --->s5			  				  \When the Left Lever is released, the variable D(2) assumes the current time value
-		
-		
+
+
 	s5,
 		.01": IF D(2)-D(1) >= E(1) [@Food, @NoFood]  		\Testing if the time between the press and release is equal or above the current prime time
 				@Food:   Add F;    --->s7					\If yes, the variable which counts the correct answers is increased in 1 unit
 				@NoFood: Set F=0;  --->s9					\If not, the variable which counts the correct answers is set to 0 and the timeout interval is set
-			
+
 	s7,
-		0": On^Food; z^OnFood; --->s8				 		\Sugar pellet delivery - ON	  
-		
+		0": On^Food; z^OnFood; --->s8				 		\Sugar pellet delivery - ON
+
 	s8,
-		0.1": Off^Food; z^OffFood; --->s9			 		\Sugar pellet delivery - OFF	 
-	
+		0.1": Off^Food; z^OffFood; --->s9			 		\Sugar pellet delivery - OFF
+
 	s9,
-		0": IF E(1)>=^InitialPrime*0.001"*^maxPrimeTime [@freeze_prime, @continue] 	\Testing if the prime has reached maxPrimeTime (in units of 100ms) 
+		0": IF E(1)>=^InitialPrime*0.001"*^maxPrimeTime [@freeze_prime, @continue] 	\Testing if the prime has reached maxPrimeTime (in units of 100ms)
 			@freeze_prime:  Set E(1)=^InitialPrime*0.001"*^maxPrimeTime; --->s3		\If yes, the prime doesn't change anymore and the prime time is set by ^maxPrimeTime (just to be sure)
 			@continue: --->s10												\If not, the prime still can be either increased or decreased
-	
+
 	s10,
 		0": IF F>=3 [@Increment, @Keep]			                      					 		 \Phase test: Testing if the subject made 3 correct answers in a row
 				@Increment: Set E(1)=E(1)+^Increment*0.001", F=0; z^OnPhase_change; --->s3       \If yes, the prime time is incremented and F is set to 0
 				@Keep: --->s3							         	 					 		 \If not, the prime time keeps the same value
-	
+
 \ *******************************************************************
 s.s.18,		\Control Flicker
 	s1,
@@ -211,7 +211,7 @@ s.s.27,		\Food state set
 		#z^OnFood           : Set A(Y)=BTIME-U+(^Food+^ON)/^STORE; Add Y,B(^Food+^ON); --->s1
 		#z^OffFood          : Set A(Y)=BTIME-U+(^Food+^OFF)/^STORE; Add Y,B(^Food+^OFF); --->s1
 
-		
+
 \ Record STATEs (state sets 26 - 29 available)
 s.s.28,		\Event codes for states start at 50
 	s1,
@@ -225,7 +225,7 @@ s.s.29,		\Phase change
 s.s.30,		\Save Prime
 	s1,
 		#z^OnPrime    		: Set A(Y)=BTIME-U+(^Prime+^ON)/^STORE; Add Y,B(^Prime+^ON); --->s1
-		
+
 s.s.31,		\Initialization
 	s1,
 		#Start: --->s2

@@ -140,7 +140,7 @@ def plotDrrd(D,title_label='Title_Label'):
     # --- mounting return variable ---
     return ([len(validPrimed)/N, len(validNonPrimed)/N, len(invalid)/N] *100)
 
-def drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True, dataPath=''):
+def individual_drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True, dataPath=''):
     # ________________________________________________________
         # Created on:       January, 14, 2019
         # Created by:       Marcelo Bussotti Reyes
@@ -367,21 +367,23 @@ def extractCriterion(phAdv,primed,primeTimes):
         newPrimeTimes = [0]*len(phAdv)                   # make all values equal to zero  
     return(newPrimeTimes)
 
-def gatherDrrd(prefix='AB1',animalID=64,sessions=[1],plotFlag=True, dataPath=''):
-    # function D = gatherDrrd(prefix,animalID,sessions,plotFlag)
+def drrd(prefix='AB1',animalID=64,sessions=[1],plotFlag=True, dataPath=''):
+    # function D = drrd(prefix,animalID,sessions,plotFlag)
     # prefix = the code for the experiment
-    # example: D = gatherDrrd('AB1',1,1:9,True)
+    # example: D = drrd('AB1',1,1:9,True)
     # runs the sessions 1 through 9 for animal 1 of the AB1 experiment.
     import numpy as np
     import matplotlib.pyplot as plt
 
     D = np.array([])  
     
-    for k in sessions:
+    if type(sessions) == int: sessions = [sessions]           # transforms the int into a list
+
+    for session in sessions:
         if len(D)>0:
-            D = np.vstack((D, drrd(prefix,animalID,k,plotFlag=False,dataPath=dataPath))) 
+            D = np.vstack((D, individual_drrd(prefix,animalID,session,plotFlag=False,dataPath=dataPath))) 
         else:
-            D = drrd(prefix,animalID,k,plotFlag=False,dataPath=dataPath)
+            D = individual_drrd(prefix,animalID,session,plotFlag=False,dataPath=dataPath)
 
 
     if plotFlag:
