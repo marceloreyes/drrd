@@ -249,14 +249,6 @@ def individual_drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True, da
     validNonPrimed = np.setdiff1d  (validTrials,primedTrials)
     invalid        = np.setdiff1d  (range(len(startIndex)), validTrials)
 
-    # --- gets the initial prime time ---
-    #if len(primeIndex) >= 1:
-    #    iniPh = data[primeIndex[0],0] - data[primeIndex[0]-1,0]
-    #else:
-    #    iniPh = 1.2
-    #    print('Warning: initial criterion cound not be retrieved from file, assumed 1.2 s')
-
-
     # --- Organizing data in one single matriz: D --- 
     D = np.zeros((len(startIndex),Ncols))             # Initiates the vector for speed
 
@@ -439,15 +431,6 @@ def KDE(x,x_grid = range(0,8), bw=0.25, split=True, NSplit=100):
     
         return([yscaled1,yscaled2])
 
+if __name__ == "__main__":
+    D = drrd(prefix='AB1',animalID=64,sessions=[1],plotFlag=True, dataPath='../sampleData/')
 
-    
-'''
-def movingAverage(x,N=20):
-    
-    if len(x) > 2*N: 
-        initialValue = x[0]
-        for i,k in enumerate(x):
-            [ 
-    else:
-        print('Not enough data for printing moving average')
-'''
