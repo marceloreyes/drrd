@@ -84,11 +84,15 @@ def plotDrrd(D,title_label='Title_Label'):
     validNonPrimed = [i for i in range(N) if (D[i,primed]==0 and D[i,valid]==1)]
     invalid        = [i for i in range(N) if D[i,valid]==0] 
 
+    # activating iteractive mode
+    plt.ion()
+
     # --- plotting the prime times ---
-    plt.plot(D[:,primeT],range(N),'grey',linewidth=2)
+    plt.plot(D[:,primeT],range(N),'grey',linewidth=2,alpha=0.5)
 
     # --- setting up the scale and title ---
-    xmax = np.round(np.mean(D[:,0])+ 4*np.std(D[:,0]))
+    #xmax = np.round(np.mean(D[:,0])+ 6*np.std(D[:,0]))
+    xmax  = 10
     plt.xlim((0,xmax))
     plt.ylim((0,N+5))
     plt.xlabel('time (s)',fontsize=20)
@@ -103,40 +107,41 @@ def plotDrrd(D,title_label='Title_Label'):
     #patch([ D(:,5); D(end,5); 0.00; 0.00], [1:N N+5 N+5 0], [0 110 144]/255 ,'EdgeColor' ,'none');% % [.7 .8 .7]
     #patch([ D(:,5); D(end,5); 0.00; 0.00], [1:N N+5 N+5 0], [0.8 0.8 0.8] ,'EdgeColor' ,'none');% % [.7 .8 .7]
 
-    # --- Plotting each trial in a different style ---
-    #mycolor = [0,.8,.9]
-    mysize  = 50
-    lw      = 1
-    color   = 'white'
-    plt.scatter(D[validPrimed,0]   ,validPrimed,   s=mysize,  linewidths=lw, marker='o',c=color, edgecolors='k' )
-    plt.scatter(D[validNonPrimed,0],validNonPrimed,s=mysize,  linewidths=lw, marker='o',c=color, edgecolors='k' )
-    plt.scatter(D[invalid,0]       ,       invalid,s=mysize,  linewidths=lw, marker='o',c=color, edgecolors='r' )
-
     # --- printing the lines dividing the sessions ---
     div = np.where(np.diff(D[:,session]))[0]
     for i in div:
-        plt.plot(plt.xlim(),[div,div])
+        plt.plot(plt.xlim(),[div,div],lw=0.5,alpha=0.5)
 
     # --- Plotting the response distributions ---
-    xmi = 0 
-    xma = np.round(np.mean(D[:,0])+4*np.std(D[:,0]))
+    xmin = 0
+    #xma = np.round(np.mean(D[:,0])+4*np.std(D[:,0]))
     Nx_grid = 100
-
-    x_grid = np.linspace(xmi, xma, Nx_grid)
+    x_grid = np.linspace(xmin, xmax, Nx_grid)
     split = True
-    thisKDE = KDE(D[:,0], x_grid, split=split)
+    thisKDE = KDE(D[:,0], x_grid, split=split,bw=0.5)    
+    
+    # --- plotting lines splitting the sessions ---
     if not split:
         #plt.plot(x_grid,thisKDE,)
         plt.plot(x_grid,thisKDE,color='blue',alpha=0.5,lw=4)
     else: 
         for i in range(0,2):
             plt.plot(x_grid,thisKDE[i],alpha=0.5,lw=4)
+
     #plt.fill(,thisKDE,color='blue',alpha=0.5,lw=3,baseline=0)
     # --- Plotting the moving average of the lever press durations ---
     #plot(movingAverage(D(:,1),20),1:N,'linewidth',2);
 
+    # --- Plotting each trial in a different style ---
+    #mycolor = [0,.8,.9]
+    mysize  = 5
+    lw      = 0.8
+    face_color   = 'white'
+    plt.scatter(D[validPrimed,0]   ,validPrimed,   s=mysize,  linewidths=lw, marker='o',c=face_color, edgecolors='k' )
+    plt.scatter(D[validNonPrimed,0],validNonPrimed,s=mysize,  linewidths=lw, marker='o',c=face_color, edgecolors='k' )
+    plt.scatter(D[invalid,0]       ,       invalid,s=mysize,  linewidths=lw, marker='o',c=face_color, edgecolors='r' )
+
     plt.show()
-    plt.ion()
     # --- mounting return variable ---
     return ([len(validPrimed)/N, len(validNonPrimed)/N, len(invalid)/N] *100)
 
@@ -379,7 +384,7 @@ def drrd(prefix='AB1',animalID=64,sessions=[1],plotFlag=True, dataPath=''):
 
 
     if plotFlag:
-        plotDrrd(D,title_label='Animal: '+str(animalID)+' sessions: '+str(sessions))
+        plotDrrd(D,title_label='Rat:'+str(animalID)+' Sess:'+str(sessions))
     
     return(D)
 
@@ -414,7 +419,7 @@ def KDE(x,x_grid = range(0,8), bw=0.25, split=True, NSplit=100):
     import numpy as np
 
     if 2*NSplit > len(x): 
-        NSplit =  np.floor(len(x)/2)
+        NSplit =  int(np.floor(len(x)/2))
         print('Number of trials to split too large, trials split in half')
 
     if not split:
@@ -422,11 +427,11 @@ def KDE(x,x_grid = range(0,8), bw=0.25, split=True, NSplit=100):
         return(scaleKDE(x,y))
     else:
         xSplit =  x[0:NSplit]
-        y = evaluateKDE(xSplit,x_grid,bw=0.2)
+        y = evaluateKDE(xSplit,x_grid,bw=bw)
         yscaled1 = scaleKDE(xSplit,y,scale = len(x))
 
         xSplit =  x[-NSplit-1:-1]
-        y = evaluateKDE(xSplit,x_grid,bw=0.2)
+        y = evaluateKDE(xSplit,x_grid,bw=bw)
         yscaled2 = scaleKDE(xSplit,y,scale = len(x)) 
     
         return([yscaled1,yscaled2])
