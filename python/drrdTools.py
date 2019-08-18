@@ -72,7 +72,7 @@ def plotDrrd(D,title_label='Title_Label'):
 
     import numpy as np
     import matplotlib.pyplot as plt
-
+    
     primed  = 2
     valid   = 3
     primeT  = 4
@@ -91,9 +91,7 @@ def plotDrrd(D,title_label='Title_Label'):
     plt.plot(D[:,primeT],range(N),'grey',linewidth=2,alpha=0.5)
 
     # --- setting up the scale and title ---
-    #xmax = np.round(np.mean(D[:,0])+ 6*np.std(D[:,0]))
-    xmax  = 10
-    plt.xlim((0,xmax))
+    #plt.xlim((0,xmax))
     plt.ylim((0,N+5))
     plt.xlabel('time (s)',fontsize=20)
     plt.ylabel('trial',fontsize=20)
@@ -114,6 +112,7 @@ def plotDrrd(D,title_label='Title_Label'):
 
     # --- Plotting the response distributions ---
     xmin = 0
+    xmax = 10
     #xma = np.round(np.mean(D[:,0])+4*np.std(D[:,0]))
     Nx_grid = 100
     x_grid = np.linspace(xmin, xmax, Nx_grid)
@@ -136,7 +135,7 @@ def plotDrrd(D,title_label='Title_Label'):
     #mycolor = [0,.8,.9]
     mysize  = 5
     lw      = 0.8
-    face_color   = 'white'
+    face_color   = 'black'
     plt.scatter(D[validPrimed,0]   ,validPrimed,   s=mysize,  linewidths=lw, marker='o',c=face_color, edgecolors='k' )
     plt.scatter(D[validNonPrimed,0],validNonPrimed,s=mysize,  linewidths=lw, marker='o',c=face_color, edgecolors='k' )
     plt.scatter(D[invalid,0]       ,       invalid,s=mysize,  linewidths=lw, marker='o',c=face_color, edgecolors='r' )
@@ -203,10 +202,12 @@ def individual_drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True, da
     # small correction for a bug in the med-pc file ---
     # if the animal presses the lever at the same cycle of the Start command in the
     # box, the first time can be registered wrong, so this sets it to zero as it 
-    # should be
-    if data[0,0] > data[1,0]:
-        data[0,0] = 0
-        
+    # should be    
+    #if data[0,0] > data[1,0]:
+    #    data[0,0] = 0
+
+    data = fix_clock_reset(data)
+         
     # --- look for indexes of temporal events ---
     #startIndex      = np.find(data[:,2]== 1)  
     startIndex    = np.array([i for i in range(len(data)) if data[i,1] == 1])
@@ -217,7 +218,12 @@ def individual_drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True, da
     phaseAdvIndex = np.array([i for i in range(len(data)) if data[i,1] == 17]) # indexes of trials where phase was advanced
     phaseBckIndex = np.array([i for i in range(len(data)) if data[i,1] == 27]) # indexes of trials where phase was retreated
 
-    startIndex    = startIndex[range(len(endIndex))] #eliminates the last trial in case it was incomplete
+    #startIndex    = startIndex[range(len(endIndex)-1)] #eliminates the last trial in case it was incomplete
+    print('_'*80)
+    print(len(startIndex))
+    print(len(endIndex))
+    print('_'*80)
+    startIndex    = startIndex[0:len(endIndex)] #eliminates the last trial in case it was incomplete
     
     # --- checking if there was at least one trial, 
     # --- otherwise stops the routine end return empty vector
@@ -364,7 +370,7 @@ def extractCriterion(phAdv,primed,primeTimes):
         newPrimeTimes = [0]*len(phAdv)                   # make all values equal to zero  
     return(newPrimeTimes)
 
-def drrd(prefix='AB1',animalID=64,sessions=[1],plotFlag=True, dataPath=''):
+def drrd(prefix='AB1',animalID=7,sessions=[7],plotFlag=True, dataPath=''):
     # function D = drrd(prefix,animalID,sessions,plotFlag)
     # prefix = the code for the experiment
     # example: D = drrd('AB1',1,1:9,True)
@@ -406,7 +412,7 @@ def scaleKDE(x,y,scale=''):
     factor = scale/np.max(y)
     return(y*factor)
 
-def KDE(x,x_grid = range(0,8), bw=0.25, split=True, NSplit=100): 
+def KDE(x,x_grid = range(0,8), bw=0.25, split=True, NSplit=100,normalize = False): 
     # function that calculates the kernel density estimate
     # parameters: 
     #   xmi,xma = minimum (maximum) value of the range for x_grid
@@ -435,6 +441,33 @@ def KDE(x,x_grid = range(0,8), bw=0.25, split=True, NSplit=100):
         yscaled2 = scaleKDE(xSplit,y,scale = len(x)) 
     
         return([yscaled1,yscaled2])
+
+def fix_clock_reset(data):
+    # sometimes the clock reset of the hardware (medPC) happens after
+    # the beginning of the experiment. Typically it happens in the second
+    # trial, but we detected that is happened later. This small routine 
+    # fix this bug by eliminating all the trials before the reset. 
+    
+    import numpy as np
+
+    # --- detecting if the event times are allways increasing
+    # --- using the np.diff and then the where
+    ind = np.where(np.diff(data[:,0])<0)    # looks for moments where the time decreased (diff<0)
+    ind = ind[0]                            # gets only the ndarray (peculiar to numpy.where and its way to return the variables)
+    
+    # detects if there were one or more events
+    # keeping only the last one
+    if len(ind)>=1: 
+        print('Warning: eliminated first ',ind, ' trials due to clock reset issue')
+        ind = int(ind[-1])
+        if data[ind+1,1] == 3 and len(data[:,0]>2): # if it starts with a 3 (which is a lever release), eliminate this trial
+            return(data[(ind+2):,:])
+        else:
+            return(data[(ind+1):,:])   
+
+    # if it is always increasing, just returns the same data
+    return(data)
+
 
 if __name__ == "__main__":
     D = drrd(prefix='AB1',animalID=64,sessions=[1],plotFlag=True, dataPath='../sampleData/')

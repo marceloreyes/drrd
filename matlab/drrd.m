@@ -85,20 +85,21 @@ end
 % if the animal presses the lever at the same cycle of the Start command in the
 % box, the first time can be registered wrong, so this sets it to zero as it 
 % should be
-
-if data(1,1) > data(2,1)
-	data(1,1) = 0;
-end
+data = fix_clock_reset(data);
 
 % --- look for indexes of temporal events ---
 startIndex      = find(data(:,2)== 1);  
 endIndex        = find(data(:,2)== 3);  
-startIndex      = startIndex(1:length(endIndex));	% eliminates the last trial in case it was incomplete
 primeIndex      = find(data(:,2)==18); 
 lightOnIndex    = find(data(:,2)==11);
 lightOffIndex   = find(data(:,2)==21);
 phaseAdvIndex   = find(data(:,2)==17);        % indexes of trials where phase was advanced
 phaseBckIndex   = find(data(:,2)==27);        % indexes of trials where phase was retreated
+
+% checking if trials start with an startIndex, otherwise eliminates the
+% first endIndex (there is no way to measure the tive of the trial if we do
+% not know when it started)
+[startIndex,endIndex] = checkAndFixIndices(startIndex,endIndex);
 
 
 % --- searching for trials in which the animals received food. We call these "primed" ----
@@ -206,12 +207,49 @@ end
 %__________________________________________________________________________
 
 function filename = makeFileName(prefix, animalID, session)
-% --- Function to put the parts of the file name together ---
+    % --- Function to put the parts of the file name together ---
 
-animalID = num2str(animalID/1000,'%.3f'); 
-animalID = animalID(3:end);			% same with animalID to 3 digits
-session  = num2str(session/1000,'%.3f'); 
-session  = session(2:end);			% converts the session to .+3 digits
-filename=[prefix animalID session]; 	% put together the parts 
-%_______________________________________________________________________________
+    animalID = num2str(animalID/1000,'%.3f'); 
+    animalID = animalID(3:end);			% same with animalID to 3 digits
+    session  = num2str(session/1000,'%.3f'); 
+    session  = session(2:end);			% converts the session to .+3 digits
+    filename=[int16(prefix) animalID session]; 	% put together the parts 
+%__________________________________________________________________________
+
+function ret = fix_clock_reset(data)
+    %sometimes the clock reset of the hardware (medPC) happens after
+    % the beginning of the experiment. Typically it happens in the second
+    % trial, but we detected that is happened later. This small routine 
+    % fix this bug by eliminating all the trials before the reset. 
+
+    % x must be a nx2 array
+
+    % --- detecting if the event times in the fist column are allways increasing
+    % and keep the last time it happened
+    ind = find(diff(data(:,1))<-10,1,'last');
+
+    if ~isempty(ind)
+        fprintf('Warning: eliminated first %d trial(s) due to clock reset issue\n\n',ind)
+        ret = data((ind+1):end,:);
+    else
+        ret = data;
+    end
+
+%__________________________________________________________________________
+
+function [startIndex,endIndex] = checkAndFixIndices(startIndex,endIndex)
+    % Fist checking if the data begins in the right order: with a
+    % trial-start. Hence if the fist entry of the endIndex is smaller than
+    % the startIndex, there is something wrong
+    if endIndex(1)<startIndex(1)
+        ind = find(endIndex<startIndex(1),1,'last');   % finds all start smaller than
+        if ~isempty(ind)                                % if finds any
+            if length(endIndex)>ind                     % checks if there are more indices to keep
+                endIndex = endIndex(ind+1:end);           % cuts the first trials
+            end
+        end
+    end
+        
+    % now ckecking if there are trials whose start was recorded but not the end    
+    startIndex      = startIndex(1:length(endIndex));	% eliminates the last trial in case it was incomplete
 
