@@ -190,7 +190,7 @@ def individual_drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True, da
     validCol   = 3
     phaseCol   = 4
     sessionCol = 5              # session variable column index
-    Ncols = 7
+    Ncols = 6
 
     data = med2tec(dataPath + filename)    # reads data from medpc format to time-event code
     data = np.array(data)
