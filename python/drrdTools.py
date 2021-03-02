@@ -1,3 +1,35 @@
+from sklearn import mixture
+import matplotlib.pyplot as plt
+import numpy as np
+#from pylab import *
+from scipy.optimize import leastsq
+from scipy.optimize import curve_fit
+#from scipy.stats import *
+import drrdTools as dr
+import os
+
+
+# --- General Settings ----
+homePath = os.path.realpath('../data/raw/pharmac_mPFC/')+'/'
+
+## parameters for the graphical output
+font = {'family' : 'sans',
+        'weight' : 'medium',
+        'size'   : 12}
+#plt.rc('font', **font)#
+#plt.rc('text', usetex=True)
+
+# parameters for histograms and for plotting the distributions
+(xmi,xma,dt) = 0,6,0.1
+dtFine       = dt/10
+
+# determining the bin edges for the plots
+x     = np.arange(xmi,xma,dt)
+xfine = np.arange(xmi,xma,dtFine)
+
+# ---------------------------------------------------
+
+
 def med2tec(fNAME,flag='A'):
     # written by Marcelo Bussotti Reyes - Universidade Federal do ABC
     # Based on the Matlab code writen by Marcelo Caetano.
@@ -70,9 +102,11 @@ def plotDrrd(D,title_label='Title_Label'):
         # Format:           plotDrrd(D,'tittle label')
         # Example:          d = plotDrrd(D,'191014-Session1'); 
 
-    import numpy as np
-    import matplotlib.pyplot as plt
-    
+    # --- checking if data variable contains any data. Otherwise exit
+    if len(D) == 0:
+        print('No data found, exiting\n')
+        return([])
+
     primed  = 2
     valid   = 3
     primeT  = 4
@@ -178,7 +212,6 @@ def individual_drrd(prefix='AB1',animalID = 64,session  = 1, plotFlag = True, da
         #                   Included session column (6th) and the input format
         #                   (Marcelo B. Reyes 2013)
 
-    import numpy as np
 
     # builds file name from parsed parameters - uses zfill to pad with zeros
     filename = prefix + str(animalID).zfill(3) + '.' + str(session).zfill(3)
@@ -375,8 +408,6 @@ def drrd(prefix='AB1',animalID=7,sessions=[7],plotFlag=True, dataPath=''):
     # prefix = the code for the experiment
     # example: D = drrd('AB1',1,1:9,True)
     # runs the sessions 1 through 9 for animal 1 of the AB1 experiment.
-    import numpy as np
-    import matplotlib.pyplot as plt
 
     D = np.array([])  
     
@@ -405,7 +436,6 @@ def evaluateKDE(x,x_grid,bw=0.2):
 def scaleKDE(x,y,scale=''):
     # determines the amplitude of the KDE to fit to the graph range (y-axis)
     # usually it will scale to the number of trials
-    import numpy as np
 
     if scale == '': scale = len(x)
 
@@ -422,7 +452,6 @@ def KDE(x,x_grid = range(0,8), bw=0.25, split=True, NSplit=100,normalize = False
     #   plotFlag= True to also print output to a graph otherwise just return the calculations
     #   Nsplit  = number of trials to use at the beginning and end of the session    
         
-    import numpy as np
 
     if 2*NSplit > len(x): 
         NSplit =  int(np.floor(len(x)/2))
@@ -448,7 +477,6 @@ def fix_clock_reset(data):
     # trial, but we detected that is happened later. This small routine 
     # fix this bug by eliminating all the trials before the reset. 
     
-    import numpy as np
 
     # --- detecting if the event times are allways increasing
     # --- using the np.diff and then the where
@@ -468,6 +496,189 @@ def fix_clock_reset(data):
     # if it is always increasing, just returns the same data
     return(data)
 
+def separate_gaussians(x, params, number):
+    (gamma, mu1, sigma1, mu2, sigma2) = params
+    dt = np.unique(np.round(np.diff(x),4))
+    res = (1-gamma) * np.exp( - (x - mu1)**2.0 / (2.0 * sigma1**2.0) ) \
+        +    gamma  * np.exp( - (x - mu2)**2.0 / (2.0 * sigma2**2.0) )
+    norm = np.sum(res)*dt
+    
+    if number == 0:
+        res = (1-gamma) * np.exp( - (x - mu1)**2.0 / (2.0 * sigma1**2.0) )/norm
+    else: 
+        res =    gamma  * np.exp( - (x - mu2)**2.0 / (2.0 * sigma2**2.0) )/norm
+    return res
+
+def double_gaussian(x, gamma, mu1, sigma1, mu2, sigma2):
+    dt = np.unique(np.round(np.diff(x),4))        # getting the value of dt as difference between x steps
+    res = (1-gamma)  * np.exp( - (x - np.abs(mu1))**2.0 / (2.0 * sigma1**2.0) ) \
+        +    gamma   * np.exp( - (x - np.abs(mu2))**2.0 / (2.0 * sigma2**2.0) )
+    return(res/np.sum(res)/dt)
+
+def single_gaussian( x, mu, sigma):
+    dt = np.unique(np.round(np.diff(x),4))
+    res =   np.exp( - (x - mu)**2.0 / (2.0 * sigma**2.0) )/sigma/np.sqrt(2*np.pi)
+    return(res/np.sum(res)/dt)
+    
+def get_data_from_rat (animal,session,x,indexes=(0,None), prefix='AL0', dataPath= homePath):
+    # indexes are the trials that should be considered 
+    # example: indexes=(0,100) only the first 100 trials will be analyezed
+    # indexes = (-100, None) the last 100 trials will be analyzed
+    
+    # get the indexes values to slice the vector
+    i, j = indexes
+
+    # reading data from raw file
+    D = dr.drrd(prefix= prefix, animalID=animal, sessions=session, plotFlag=False,\
+               dataPath= dataPath)
+
+    # Trying to slice the data matrix according to indexes
+    try:
+        D = D[i:j,:]
+    except:
+        print('Could not reduce the data matrix to indexes')
+        return([],[])
+
+    y = calc_histogram(D[:,0],x)
+        
+    return(D,y)
+
+def calc_histogram(T,x):
+    
+    # calculating the histogram counts for the data
+    import seaborn as sns
+
+    
+    pal = sns.cubehelix_palette(6, rot=-.45, light=.7)
+    data = plt.hist(T, bins=x-dt/2, histtype='stepfilled', density=True,align='mid', color = pal[0], alpha = 1)
+
+    # selecting only the counts and ignoring the bins edges
+    data = data[0] 
+    
+    #adding zero to the end to generate a vector with the same size as x
+    y = np.append(data,0)
+    
+    # normalizing the histogram
+    y = y/np.sum(y)/dt
+    
+    return(y)
+
+def plot_all_curves(x,fit,fit_single,dt,fontDict=font,plotSingle=False):
+    # plotting the separate gaussians
+    
+    plt.plot( x, separate_gaussians( x, fit, number = 0), '-.', c='k', lw=1.0, label='Gauss1')
+    plt.plot( x, separate_gaussians( x, fit, number = 1), '--', c='k', lw=1.0, label='Gauss2')
+    plt.plot( x, double_gaussian   ( x, *fit),             '-', c='k', lw=5.0, label='dGauss', alpha = 0.3)
+    #plt.xlabel('Duration (s)')
+    
+    if plotSingle:
+        # plotting the single gaussian fitted
+        plt.plot( x, single_gaussian( x, *fit_single),         '-.',c='k', lw=1.5,label='single gauss.')
+    
+    # xlim and adding axes labels
+    plt.xlim([-dt/2,3])
+    plt.xlabel('duration (s)')
+    plt.ylabel('probability density')
+    
+    # returning the axes for further plotting
+    return(plt.gca)
+
+def calculate_distance(x,y,fit,model = 0):
+    if model == 'double': #double gaussian
+        ycalc = double_gaussian(x,*fit)
+        sqDist = np.sum((y-ycalc)**2)
+
+    else:
+        ycalc = single_gaussian(x,*fit)
+        sqDist = np.sum((y-ycalc)**2)
+    
+    return(sqDist)
+
+def fix_parameters_order(p):
+    # p is a vector with 5 entries: gamma, mu1, sigma1, mu2, sigma2
+    # if mu1>mu2 (the first gaussian has a greater mean), we invert the order of the parameter
+    if p[1] > p[3]:
+        print('Parameters inverted')
+        p[0] = 1-p[0]            # we invert the order, and gamma needs to be replaced by 1-gamma
+        return(p[[0,3,4,1,2]])
+    else:
+        return(p)
+
+def fit_single_animal(animal,session,plotFlag=True,indexes=(0,None),ax=None, prefix='AL0', dataPath= homePath):
+    # get data from file: 
+    # y is the probabilty density with bins defined by x
+    # D is the data from the session obtained from drrdTools.drrd() method
+    
+    
+    # getting data from file
+    D,y = get_data_from_rat(animal,session,x,indexes, prefix= prefix, dataPath= dataPath)
+
+    # Checking if D is not empty    
+    if len(D) == 0:
+        print('No data found, quiting.')
+        return([np.nan,np.nan,np.nan,np.nan,np.nan,np.nan,np.nan,np.nan,np.nan])
+    
+    # fit single gaussian
+    popt_sngl,pcov_sngl = curve_fit(single_gaussian, x, y, bounds=(0, [10, 5]),p0=[1,0.5])
+    d_sngl = calculate_distance(x,y,popt_sngl,model='single')
+    
+    
+    # fit the double gaussian
+    initParsDouble = (0.5,0.2,0.1,1,0.5)
+    popt,pcov = curve_fit(double_gaussian, x, y, bounds=(0, [1, 5, 5, 5, 5]),p0=initParsDouble)
+    
+    popt = fix_parameters_order(popt)
+    
+    d = calculate_distance(x,y,popt,model='double')
+    
+    # bundling all values to return them together
+    r = np.concatenate((popt,[d],popt_sngl,[d_sngl]))
+    
+    # drawing all curves into the graph
+    if plotFlag:
+        plot_all_curves(xfine,popt,popt_sngl,dtFine)
+ #       add_info_to_graph(animal,session,r)
+ #       
+    
+    # That'it. Let's return the values and get out of here
+    return(r)
+
+def add_info_to_graph(rat,session,rr,addSingleInfo=False):
+    #ax = axis handle to plot
+    #rat = animal id
+    #session = session to plot
+    # rr the parameters of the fit: gamma mu1 sig1 mu2 sig2 chi mu sig chi
+    # parameters for the graphical output
+    
+    font = {'family' : 'sans',
+            'weight' : 'medium',
+            'size'   : 12}
+    plt.rc('font', **font)
+    plt.rc('text', usetex=True)
+    
+    #adding a title for the graph
+    plt.title('animal:' + str(rat) + '\tsession: ' + str(session))
+    
+    # some mambo jambo with the coordinates to find the right coordinates for text
+    yi,yf = plt.ylim()
+    xi,xf = plt.xlim()
+    xt = (xf-xi)*0.70
+    yt = (yi+yf)*0.55
+    dy = (yf-yi)*0.06
+
+    # now let's finally add the information to the graph
+    rr = np.round(rr,2)
+    plt.text(xt, yt        , '\mu_1='   +str(rr[1]) + ' \sigma_1=' + str(rr[2]))        
+    plt.text(xt, yt -  dy  , '\mu_2='   +str(rr[3]) + ' \sigma_2=' + str(rr[4]))        
+    plt.text(xt, yt -2.1*dy, '\gamma='  +str(rr[0]) + ' sd_d='     + str(rr[5]))
+    plt.text(xt, yt -2.1*dy, '\gamma$=' +str(rr[0]) )
+    
+    if addSingleInfo:
+        plt.text(xt, yt -4*dy, '$\mu$= '    +str(rr[6]) + ' $\sigma$='   + str(rr[7]))        
+        plt.text(xt, yt -5.3*dy, '$sd_s$= '   +str(rr[8]))
+    
+    plt.legend()
+    plt.show()
 
 if __name__ == "__main__":
     D = drrd(prefix='AB1',animalID=64,sessions=[1],plotFlag=True, dataPath='../sampleData/')
