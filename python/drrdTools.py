@@ -124,7 +124,7 @@ def plotDrrd(D, title_label='Title_Label'):
     plt.plot(D[:, primeT], range(N), 'grey', linewidth=2, alpha=0.5)
 
     # --- setting up the scale and title ---
-    # plt.xlim((0,xmax))
+    plt.xlim((0,4))
     plt.ylim((0, N + 5))
     plt.xlabel('time (s)', fontsize=20)
     plt.ylabel('trial', fontsize=20)
