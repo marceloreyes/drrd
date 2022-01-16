@@ -57,8 +57,7 @@ def med2tec(fNAME, flag='A'):
     # now let's look for the next letter of end of file to check how many lines we should read
     stopParse = -1  # just a code in case it finds nothing
     for i in range(startParse + 1, len(fileString)):  # for from startParse until end of file
-        if str.isalpha(fileString[i][0]) and fileString[i][
-            1] == ':':  # looks if the first element of the line is alphabetic and the next is :
+        if str.isalpha(fileString[i][0]) and fileString[i][1] == ':':  # looks if the first element of the line is alphabetic and the next is :
             stopParse = i  # saves the last position that did not start with a letter
             break
             # checking if did not find any letters, then just record the last line of the file
@@ -178,7 +177,7 @@ def plotDrrd(D, title_label='Title_Label'):
     return ([len(validPrimed) / N, len(validNonPrimed) / N, len(invalid) / N] * 100)
 
 
-def individual_drrd(prefix='AB1', animalID=64, session=1, plotFlag=True, dataPath=''):
+def individual_drrd(prefix='AB1', animalID=64, session=1, plotFlag=True, dataPath='', events_to_eliminate= None):
     # ________________________________________________________
     # Created on:       January, 14, 2019
     # Created by:       Marcelo Bussotti Reyes
@@ -194,6 +193,9 @@ def individual_drrd(prefix='AB1', animalID=64, session=1, plotFlag=True, dataPat
     #     session:      is the number of the session to be analyzed (starts in 1)
     #     plotFlag:     True if one desires to plot the results False otherwise
     #     dataPath:     path to where the data is. Default is the current directory
+    #     events_to_eliminate: gives the option to eliminate events that are not analyzed, 
+    #                   for example, responses to a non-rewarded lever, nosepokes, etc.
+    #                   Needs to be a vector with all events e.g. [5,9] or [5], or None (default)
     #
     # Output:           D, a matrix with 6 columns containing data from a trial in
     #					each line.
@@ -212,6 +214,27 @@ def individual_drrd(prefix='AB1', animalID=64, session=1, plotFlag=True, dataPat
     #                   Included session column (6th) and the input format
     #                   (Marcelo B. Reyes 2013)
 
+    
+    # defining a function meant to eliminate events that are not analyzed, for 
+    # example, nose pokes, responses to a lever that is not rewarded, etc.
+    # we suggest the experimentalist
+    def eliminate_events(M, events_to_eliminate = None):
+        
+        # tests if there are events to be eliminated
+        if events_to_eliminate != None:
+        
+            # loop over all events to be eliminated
+            for event in events_to_eliminate:
+            
+                # keeps all events but the one to be eliminated
+                # stores the results to the same variable
+                M = [M[k] for k in range(len(M)) if M[k][1] != event]
+        
+        # returns the updated variable (the same parsed if events_to_elimnate == None)
+        return(M)
+
+
+
     # builds file name from parsed parameters - uses zfill to pad with zeros
     filename = prefix + str(animalID).zfill(3) + '.' + str(session).zfill(3)
 
@@ -225,45 +248,60 @@ def individual_drrd(prefix='AB1', animalID=64, session=1, plotFlag=True, dataPat
     Ncols = 6
 
     data = med2tec(dataPath + filename)  # reads data from medpc format to time-event code
-    data = np.array(data)
+    
+    data = eliminate_events(data, events_to_eliminate = events_to_eliminate)
+        
+    data = np.array(data)                # transforms data to numpy array
 
+    # Checking if data array is empty
     if len(data) == 0:
         print('Empty file or file not found: no data analyzed\n')
         return ([])
-
-        # small correction for a bug in the med-pc file ---
-    # if the animal presses the lever at the same cycle of the Start command in the
-    # box, the first time can be registered wrong, so this sets it to zero as it 
-    # should be    
-    # if data[0,0] > data[1,0]:
-    #    data[0,0] = 0
-
+    
+    # small correction for a bug in the med-pc file ---
     data = fix_clock_reset(data)
 
-    # --- look for indexes of temporal events ---
-    # startIndex      = np.find(data[:,2]== 1)
-    startIndex  = np.array([i for i in range(len(data)) if data[i, 1] == 1])
-    endIndex    = np.array([i for i in range(len(data)) if data[i, 1] == 3])
-    primeIndex  = np.array(
-        [i for i in range(len(data)) if data[i, 1] == 18])  # trials that lasted longer than criterion (primed trials)
-    lightOnIndex  = np.array([i for i in range(len(data)) if data[i, 1] == 11])  # when light was turned on
-    lightOffIndex = np.array([i for i in range(len(data)) if data[i, 1] == 21])  # when light was turned off
-    phaseAdvIndex = np.array(
-        [i for i in range(len(data)) if data[i, 1] == 17])  # indexes of trials where phase was advanced
-    phaseBckIndex = np.array(
-        [i for i in range(len(data)) if data[i, 1] == 27])  # indexes of trials where phase was retreated
 
-    # startIndex    = startIndex[range(len(endIndex)-1)] #eliminates the last trial in case it was incomplete
+    # identifying in which index the first trial begins.
+    index_first_start = np.where(data[:,1]==1)[0][0]
+    index_first_end   = np.where(data[:,1]==3)[0][0]
+
+#---------------------------------------------------------------------------------
+    # ******** Attention **********
+    # this line is a potential problem for data with valid an invalid trials
+    # Still lacks tests
+
+    
+    # if the first trial begins after an end of trial, we need to eliminate 
+    # the "fragments" of the first trial. Everything before (including) the trial
+    # end must be eliminated
+    if index_first_start > index_first_end:
+        data = data[index_first_end+1:,:]
+#---------------------------------------------------------------------------------
+
+
+    # --- look for indexes of temporal events ---
+    startIndex    = np.array([i for i in range(len(data)) if data[i, 1] ==  1])  # code that indicates that the lever was pressed
+    endIndex      = np.array([i for i in range(len(data)) if data[i, 1] ==  3])  # instant when the lever was released
+    primeIndex    = np.array([i for i in range(len(data)) if data[i, 1] == 18])  # moment when the trial reached the criterion
+    lightOnIndex  = np.array([i for i in range(len(data)) if data[i, 1] == 11])  # when light was turned on (beginning of session)
+    lightOffIndex = np.array([i for i in range(len(data)) if data[i, 1] == 21])  # when light was turned off (end of session)
+    phaseAdvIndex = np.array([i for i in range(len(data)) if data[i, 1] == 17])  # moment of phase advance (criterion increased)
+    phaseBckIndex = np.array([i for i in range(len(data)) if data[i, 1] == 27])  # moment of phase retreat (criterion decreased)
+
+    # eliminating the last trial in case it was incomplete
+    startIndex = startIndex[0:len(endIndex)]  
+    
     print('_' * 80)
-    startIndex = startIndex[0:len(endIndex)]  # eliminates the last trial in case it was incomplete
     print(len(endIndex),' trials found')
+    
     # --- checking if there was at least one trial, 
     # --- otherwise stops the routine end return empty vector
     if len(startIndex) == 0:
         print('No trials recorded')
         return ([])
 
-        # --- searching for trials in which the animals received food. We call these "primed" ----
+    # --- searching for trials in which the animals received food. We call these "primed" ----
     primedTrials = np.array([startIndex[startIndex < i].size - 1 for i in primeIndex])
 
     # --- searching for trials in which animals progressed or retreated phase
@@ -279,25 +317,27 @@ def individual_drrd(prefix='AB1', animalID=64, session=1, plotFlag=True, dataPat
             print('Incompatible number of events')
             return (-2)
 
-    validTrials = np.array([], dtype=np.int64).reshape(0, )
+    validTrials = np.array([], dtype=np.int64).reshape(0, )   # initiates empty vector to store all valid trials
+    
     for i in range(len(lightOnIndex)):
         Nu = np.array(len(startIndex[startIndex < lightOnIndex[i]]))
         Nv = np.array(len(startIndex[startIndex < lightOffIndex[i]]))
         validTrials = np.hstack([validTrials, range(Nu, Nv)])
 
-    validTrials = np.array(validTrials)
+    validTrials = np.array(validTrials)  # transforms to numpy array
+
     # --- search for valid trials in which animals were and were not reinforded ---
-    validPrimed = np.intersect1d(validTrials, primedTrials)
-    validNonPrimed = np.setdiff1d(validTrials, primedTrials)
-    invalid = np.setdiff1d(range(len(startIndex)), validTrials)
+    validPrimed    = np.intersect1d(validTrials, primedTrials)
+    validNonPrimed = np.setdiff1d  (validTrials, primedTrials)
+    invalid        = np.setdiff1d  (range(len(startIndex)), validTrials)
 
     # --- Organizing data in one single matriz: D --- 
     D = np.zeros((len(startIndex), Ncols))  # Initiates the vector for speed
 
     # --- Calculating the duration of the lever presses ---
-    D[:, dtCol] = data[endIndex, 0] - data[startIndex, 0]
-    D[:-1, itiCol] = data[startIndex[1:], 0] - data[endIndex[:-1], 0]
-    D[-1, itiCol] = np.nan
+    D[:, dtCol]    = data[endIndex, 0]       - data[startIndex, 0]     # time elapsed from press until relesase
+    D[:-1, itiCol] = data[startIndex[1:], 0] - data[endIndex[:-1], 0]  # time between release and press ( beginning of next trial)
+    D[-1, itiCol]  = np.nan                                            # the last trial has no ITI, stores NaN
 
     # --- saving each data in respective column
     if len(primedTrials) > 0: D[primedTrials, primedCol] = 1  # sets to 1 all the trials that were primed
@@ -321,6 +361,7 @@ def individual_drrd(prefix='AB1', animalID=64, session=1, plotFlag=True, dataPat
         thisIndex = startIndex[primed]
         primeTimes[primed] = np.round(data[thisIndex + 1, 0] - data[thisIndex, 0], decimals=5)
 
+    print(np.unique(primeTimes))
     crit = extractCriterion(phAdv=D[:, phaseCol], primed=D[:, primedCol], primeTimes=primeTimes)
     D[:, phaseCol] = crit
 
@@ -345,7 +386,8 @@ def extractCriterion(phAdv, primed, primeTimes):
 
         # second, values that are too close
         t = [round(k, 1) for k in t]  # narrows down to round values
-        t = list(set(t))  # and eliminate the values that are equal
+        t = list(set(t))              # and eliminate the values that are equal
+        
         if len(t) == 1:
             print('Successfully fixed')
             print(t)
@@ -402,7 +444,7 @@ def extractCriterion(phAdv, primed, primeTimes):
     return (newPrimeTimes)
 
 
-def drrd(prefix='AB1', animalID=7, sessions=[7], plotFlag=True, dataPath=''):
+def drrd(prefix='AB1', animalID=7, sessions=[7], plotFlag=True, dataPath='', events_to_eliminate = None):
     # function D = drrd(prefix,animalID,sessions,plotFlag)
     # prefix = the code for the experiment
     # example: D = drrd('AB1',1,1:9,True)
@@ -414,9 +456,9 @@ def drrd(prefix='AB1', animalID=7, sessions=[7], plotFlag=True, dataPath=''):
 
     for session in sessions:
         if len(D) > 0:
-            D = np.vstack((D, individual_drrd(prefix, animalID, session, plotFlag=False, dataPath=dataPath)))
+            D = np.vstack((D, individual_drrd(prefix, animalID, session, plotFlag=False, dataPath=dataPath, events_to_eliminate = events_to_eliminate)))
         else:
-            D = individual_drrd(prefix, animalID, session, plotFlag=False, dataPath=dataPath)
+            D =               individual_drrd(prefix, animalID, session, plotFlag=False, dataPath=dataPath, events_to_eliminate = events_to_eliminate)
 
     if plotFlag:
         plotDrrd(D, title_label='Rat:' + str(animalID) + ' Sess:' + str(sessions))
@@ -487,8 +529,7 @@ def fix_clock_reset(data):
     if len(ind) >= 1:
         print('Warning: eliminated first ', ind, ' trials due to clock reset issue')
         ind = int(ind[-1])
-        if data[ind + 1, 1] == 3 and len(
-                data[:, 0] > 2):  # if it starts with a 3 (which is a lever release), eliminate this trial
+        if data[ind + 1, 1] == 3 and len(data[:, 0] > 2):  # if it starts with a 3 (which is a lever release), eliminate this trial
             return (data[(ind + 2):, :])
         else:
             return (data[(ind + 1):, :])
