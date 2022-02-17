@@ -177,7 +177,8 @@ def plotDrrd(D, title_label='Title_Label'):
     return ([len(validPrimed) / N, len(validNonPrimed) / N, len(invalid) / N] * 100)
 
 
-def individual_drrd(prefix='AB1', animalID=64, session=1, plotFlag=True, dataPath='', events_to_eliminate= None):
+def individual_drrd(prefix='AB1', animalID=64, session=1, plotFlag=True, dataPath='', \
+		    events_to_eliminate= None):
     # ________________________________________________________
     # Created on:       January, 14, 2019
     # Created by:       Marcelo Bussotti Reyes
@@ -215,6 +216,26 @@ def individual_drrd(prefix='AB1', animalID=64, session=1, plotFlag=True, dataPat
     #                   (Marcelo B. Reyes 2013)
 
     
+    
+    # cuts the original data and returns the data from the startEvent on 
+    def eliminate_beginning(M, startEvent = None):
+    
+        # tests if there is an startEvent
+        if startEvent != None:
+        
+            # checking when was the last time the event occurred (item of the list)
+            last_occurrence = [M[k] for k in range(len(M)) if M[k][1] == startEvent][-1]
+            
+            # finds the corresponding index
+            cuttoff_index = M.index(last_occurrence)
+
+	    # overrides the vector discarding events before the startEvent
+            M = M[cuttoff_index:]
+        
+        # returns the updated variable (the same as parsed if startEvent == None)
+        return(M)
+    
+    
     # defining a function meant to eliminate events that are not analyzed, for 
     # example, nose pokes, responses to a lever that is not rewarded, etc.
     # we suggest the experimentalist
@@ -233,7 +254,7 @@ def individual_drrd(prefix='AB1', animalID=64, session=1, plotFlag=True, dataPat
         # returns the updated variable (the same parsed if events_to_elimnate == None)
         return(M)
 
-
+    
 
     # builds file name from parsed parameters - uses zfill to pad with zeros
     filename = prefix + str(animalID).zfill(3) + '.' + str(session).zfill(3)
@@ -249,8 +270,20 @@ def individual_drrd(prefix='AB1', animalID=64, session=1, plotFlag=True, dataPat
 
     data = med2tec(dataPath + filename)  # reads data from medpc format to time-event code
     
+    # eliminating all the data that occurs before the event 11 (start session code)
+    data = eliminate_beginning(data, startEvent = 11)
+    
     data = eliminate_events(data, events_to_eliminate = events_to_eliminate)
-        
+
+
+    # finding where the animal pressed the lever for the first time (first start)
+    data_first_start = [data[k] for k in range(len(data)) if data[k][1] == 1][0]
+    index_first_start = data.index(data_first_start)
+
+    # eliminating the lever releases (code 3) that happened before the first lever press
+    # such events only happens if the animal starts the session (code 11) with the lever pressed
+    data = [data[k] for k in range(len(data)) if not (data[k][1] == 3 and k <= index_first_start)]
+    
     data = np.array(data)                # transforms data to numpy array
 
     # Checking if data array is empty
@@ -260,24 +293,6 @@ def individual_drrd(prefix='AB1', animalID=64, session=1, plotFlag=True, dataPat
     
     # small correction for a bug in the med-pc file ---
     data = fix_clock_reset(data)
-
-
-    # identifying in which index the first trial begins.
-    index_first_start = np.where(data[:,1]==1)[0][0]
-    index_first_end   = np.where(data[:,1]==3)[0][0]
-
-#---------------------------------------------------------------------------------
-    # ******** Attention **********
-    # this line is a potential problem for data with valid an invalid trials
-    # Still lacks tests
-
-    
-    # if the first trial begins after an end of trial, we need to eliminate 
-    # the "fragments" of the first trial. Everything before (including) the trial
-    # end must be eliminated
-    if index_first_start > index_first_end:
-        data = data[index_first_end+1:,:]
-#---------------------------------------------------------------------------------
 
 
     # --- look for indexes of temporal events ---
@@ -316,6 +331,7 @@ def individual_drrd(prefix='AB1', animalID=64, session=1, plotFlag=True, dataPat
         else:
             print('Incompatible number of events')
             return (-2)
+      
 
     validTrials = np.array([], dtype=np.int64).reshape(0, )   # initiates empty vector to store all valid trials
     
