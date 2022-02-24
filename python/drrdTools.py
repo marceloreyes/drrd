@@ -17,7 +17,7 @@ font = {'family': 'sans',
 # plt.rc('text', usetex=True)
 
 # parameters for histograms and for plotting the distributions
-(xmi, xma, dt) = 0, 6, 0.1
+(xmi, xma, dt) = 0, 12, 0.1
 dtFine = dt / 10
 
 # determining the bin edges for the plots
@@ -112,9 +112,9 @@ def plotDrrd(D, title_label='Title_Label'):
     N = D.shape[0]
 
     # --- looking for the specific trials ---
-    validPrimed = [i for i in range(N) if (D[i, primed] == 1 and D[i, valid] == 1)]
+    validPrimed    = [i for i in range(N) if (D[i, primed] == 1 and D[i, valid] == 1)]
     validNonPrimed = [i for i in range(N) if (D[i, primed] == 0 and D[i, valid] == 1)]
-    invalid = [i for i in range(N) if D[i, valid] == 0]
+    invalid        = [i for i in range(N) if  D[i,  valid] == 0]
 
     # activating iteractive mode
     plt.ion()
@@ -177,6 +177,56 @@ def plotDrrd(D, title_label='Title_Label'):
     return ([len(validPrimed) / N, len(validNonPrimed) / N, len(invalid) / N] * 100)
 
 
+
+# cuts the original data and returns the data from the startEvent on 
+def eliminate_beginning(M, startEvent = None, trial_begin_code= 1):
+    
+    # tests if there is an startEvent
+    if startEvent != None:
+            
+        # checking when was the last time the event occurred (item of the list)
+        last_occurrence = [M[k] for k in range(len(M)) if M[k][1] == startEvent][-1]
+            
+        # finds the corresponding index
+        cuttoff_index = M.index(last_occurrence)
+
+        # overrides the vector discarding events before the startEvent
+        M = M[cuttoff_index:]
+            
+        # now eliminating the data between start event and the begining of first trial
+
+        # searching the index of the beginning of first trial
+        index_first_begin = [i for i,entry in enumerate(M) if entry[1]== trial_begin_code][0]
+
+        # now concatenate the start event with all the events from the first trial until the end
+        # overrides the data
+        M = [M[0]] + [k for i,k in enumerate(M) if i>=index_first_begin ]
+
+
+    # returns the updated variable (the same as parsed if startEvent == None)
+    return(M)
+
+
+# defining a function meant to eliminate events that are not analyzed, for 
+# example, nose pokes, responses to a lever that is not rewarded, etc.
+# we suggest the experimentalist
+def eliminate_events(M, events_to_eliminate = None):
+        
+    # tests if there are events to be eliminated
+    if events_to_eliminate != None:
+        
+        # loop over all events to be eliminated
+        for event in events_to_eliminate:
+            
+            # keeps all events but the one to be eliminated
+            # stores the results to the same variable
+            M = [M[k] for k in range(len(M)) if M[k][1] != event]
+
+    # returns the updated variable (the same parsed if events_to_elimnate == None)
+    return(M)
+
+
+
 def individual_drrd(prefix='AB1', animalID=64, session=1, plotFlag=True, dataPath='', \
 		    events_to_eliminate= None):
     # ________________________________________________________
@@ -216,57 +266,19 @@ def individual_drrd(prefix='AB1', animalID=64, session=1, plotFlag=True, dataPat
     #                   (Marcelo B. Reyes 2013)
 
     
-    
-    # cuts the original data and returns the data from the startEvent on 
-    def eliminate_beginning(M, startEvent = None):
-    
-        # tests if there is an startEvent
-        if startEvent != None:
-        
-            # checking when was the last time the event occurred (item of the list)
-            last_occurrence = [M[k] for k in range(len(M)) if M[k][1] == startEvent][-1]
-            
-            # finds the corresponding index
-            cuttoff_index = M.index(last_occurrence)
-
-	    # overrides the vector discarding events before the startEvent
-            M = M[cuttoff_index:]
-        
-        # returns the updated variable (the same as parsed if startEvent == None)
-        return(M)
-    
-    
-    # defining a function meant to eliminate events that are not analyzed, for 
-    # example, nose pokes, responses to a lever that is not rewarded, etc.
-    # we suggest the experimentalist
-    def eliminate_events(M, events_to_eliminate = None):
-        
-        # tests if there are events to be eliminated
-        if events_to_eliminate != None:
-        
-            # loop over all events to be eliminated
-            for event in events_to_eliminate:
-            
-                # keeps all events but the one to be eliminated
-                # stores the results to the same variable
-                M = [M[k] for k in range(len(M)) if M[k][1] != event]
-        
-        # returns the updated variable (the same parsed if events_to_elimnate == None)
-        return(M)
-
-    
+   
 
     # builds file name from parsed parameters - uses zfill to pad with zeros
     filename = prefix + str(animalID).zfill(3) + '.' + str(session).zfill(3)
 
     # --- Indexes for each of the output variable columns
-    dtCol = 0
-    itiCol = 1
-    primedCol = 2
-    validCol = 3
-    phaseCol = 4
-    sessionCol = 5  # session variable column index
-    Ncols = 6
+    dtCol       = 0
+    itiCol      = 1
+    primedCol   = 2
+    validCol    = 3
+    phaseCol    = 4
+    sessionCol  = 5  # session variable column index
+    Ncols       = 6
 
     data = med2tec(dataPath + filename)  # reads data from medpc format to time-event code
     
@@ -277,9 +289,17 @@ def individual_drrd(prefix='AB1', animalID=64, session=1, plotFlag=True, dataPat
 
 
     # finding where the animal pressed the lever for the first time (first start)
-    data_first_start = [data[k] for k in range(len(data)) if data[k][1] == 1][0]
+
+    data_first_start  = [data[k] for k in range(len(data)) if data[k][1] == 1][0]
+    ### suggestion:
+    ###data_first_start  = [entry for entry in data if entry[1] == 1][0]
+    
     index_first_start = data.index(data_first_start)
 
+    ### suggestion, eliminating the step above
+    ### index_first_start = [ ind for ind,event in enumerate(data) if event == 1 ][0]
+
+    
     # eliminating the lever releases (code 3) that happened before the first lever press
     # such events only happens if the animal starts the session (code 11) with the lever pressed
     data = [data[k] for k in range(len(data)) if not (data[k][1] == 3 and k <= index_first_start)]
@@ -373,9 +393,11 @@ def individual_drrd(prefix='AB1', animalID=64, session=1, plotFlag=True, dataPat
     # from the event before, which necessarily is the lever press
     primeTimes = [0] * D.shape[0]
 
+    ### check the line below - primeTimes has probably a bug, more than real prime times happening
     for primed in primedTrials:
         thisIndex = startIndex[primed]
         primeTimes[primed] = np.round(data[thisIndex + 1, 0] - data[thisIndex, 0], decimals=5)
+
 
     print(np.unique(primeTimes))
     crit = extractCriterion(phAdv=D[:, phaseCol], primed=D[:, primedCol], primeTimes=primeTimes)
@@ -545,7 +567,7 @@ def fix_clock_reset(data):
     if len(ind) >= 1:
         print('Warning: eliminated first ', ind, ' trials due to clock reset issue')
         ind = int(ind[-1])
-        if data[ind + 1, 1] == 3 and len(data[:, 0] > 2):  # if it starts with a 3 (which is a lever release), eliminate this trial
+        if data[ind + 1, 1] != 1 and len(data[:, 0] > 2):  # if it starts with a 3 (which is a lever release), eliminate this trial
             return (data[(ind + 2):, :])
         else:
             return (data[(ind + 1):, :])
@@ -624,7 +646,7 @@ def calc_histogram(T, x):
     return (y)
 
 
-def plot_all_curves(x, fit, fit_single, dt, fontDict=font, plotSingle=False):
+def plot_all_curves(x, fit, fit_single, dt, fontDict=font, plotSingle=False, xlimits=[-dt / 2, 3]):
     # plotting the separate gaussians
 
     plt.plot(x, separate_gaussians(x, fit, number=0), '-.', c='k', lw=1.0, label='Gauss1')
@@ -637,7 +659,7 @@ def plot_all_curves(x, fit, fit_single, dt, fontDict=font, plotSingle=False):
         plt.plot(x, single_gaussian(x, *fit_single), '-.', c='k', lw=1.5, label='single gauss.')
 
     # xlim and adding axes labels
-    plt.xlim([-dt / 2, 3])
+    plt.xlim(xlimits)
     plt.xlabel('duration (s)')
     plt.ylabel('probability density')
 
@@ -668,7 +690,7 @@ def fix_parameters_order(p):
         return (p)
 
 
-def fit_single_animal(animal, session, plotFlag=True, indexes=(0, None), ax=None, prefix='AL0', dataPath=homePath):
+def fit_single_animal(animal, session, plotFlag=True, indexes=(0, None), ax=None, prefix='AL0', dataPath=homePath, initParsDoubleGauss=(0.5, 0.2, 0.1, 1, 0.5), boundsDoubleGauss=(0, [1, 5, 5, 10, 10]), xlimits=[-dt / 2, 3]):
     # get data from file: 
     # y is the probabilty density with bins defined by x
     # D is the data from the session obtained from drrdTools.drrd() method
@@ -682,12 +704,12 @@ def fit_single_animal(animal, session, plotFlag=True, indexes=(0, None), ax=None
         return ([np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan])
 
     # fit single gaussian
-    popt_sngl, pcov_sngl = curve_fit(single_gaussian, x, y, bounds=(0, [10, 5]), p0=[1, 0.5])
+    popt_sngl, pcov_sngl = curve_fit(single_gaussian, x, y, bounds=(0, [10, 10]), p0=[1, 0.5])
     d_sngl = calculate_distance(x, y, popt_sngl, model='single')
 
     # fit the double gaussian
-    initParsDouble = (0.5, 0.2, 0.1, 1, 0.5)
-    popt, pcov = curve_fit(double_gaussian, x, y, bounds=(0, [1, 5, 5, 5, 5]), p0=initParsDouble)
+    #initParsDouble = (0.5, 0.2, 0.1, 1, 0.5)
+    popt, pcov = curve_fit(double_gaussian, x, y, bounds=boundsDoubleGauss, p0=initParsDoubleGauss)
 
     popt = fix_parameters_order(popt)
 
@@ -698,7 +720,7 @@ def fit_single_animal(animal, session, plotFlag=True, indexes=(0, None), ax=None
 
     # drawing all curves into the graph
     if plotFlag:
-        plot_all_curves(xfine, popt, popt_sngl, dtFine)
+        plot_all_curves(xfine, popt, popt_sngl, dtFine, xlimits=xlimits)
     #       add_info_to_graph(animal,session,r)
     #
 
