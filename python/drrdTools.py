@@ -728,6 +728,41 @@ def fit_single_animal(animal, session, plotFlag=True, indexes=(0, None), ax=None
     return (r)
 
 
+def fit_single_animal_from_matrix(D, y, animal, session, plotFlag=True, indexes=(0, None), ax=None, prefix='AL0', dataPath=homePath, initParsDoubleGauss=(0.5, 0.2, 0.1, 1, 0.5), boundsDoubleGauss=(0, [1, 5, 5, 10, 10]), xlimits=[-dt / 2, 3]):
+    # get data from file: 
+    # y is the probabilty density with bins defined by x
+    # D is the data from the session obtained from drrdTools.drrd() method
+
+    # Checking if D is not empty    
+    if len(D) == 0:
+        print('No data found, quiting.')
+        return ([np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan])
+
+    # fit single gaussian
+    popt_sngl, pcov_sngl = curve_fit(single_gaussian, x, y, bounds=(0, [10, 10]), p0=[1, 0.5])
+    d_sngl = calculate_distance(x, y, popt_sngl, model='single')
+
+    # fit the double gaussian
+    #initParsDouble = (0.5, 0.2, 0.1, 1, 0.5)
+    popt, pcov = curve_fit(double_gaussian, x, y, bounds=boundsDoubleGauss, p0=initParsDoubleGauss)
+
+    popt = fix_parameters_order(popt)
+
+    d = calculate_distance(x, y, popt, model='double')
+
+    # bundling all values to return them together
+    r = np.concatenate((popt, [d], popt_sngl, [d_sngl]))
+
+    # drawing all curves into the graph
+    if plotFlag:
+        plot_all_curves(xfine, popt, popt_sngl, dtFine, xlimits=xlimits)
+    #       add_info_to_graph(animal,session,r)
+    #
+
+    # That'it. Let's return the values and get out of here
+    return (r)
+
+
 def add_info_to_graph(rat, session, rr, addSingleInfo=False):
     # ax = axis handle to plot
     # rat = animal id
